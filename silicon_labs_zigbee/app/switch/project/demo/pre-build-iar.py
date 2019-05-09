@@ -8,7 +8,7 @@
 @Copyright: HANGZHOU TUYA INFORMATION TECHNOLOGY CO.,LTD
 @Company: http://www.tuya.com
 @Date: 2019-04-15 10:19:39
-@LastEditTime: 2019-04-25 15:15:57
+@LastEditTime: 2019-04-20 14:41:33
 '''
 
 import sys
@@ -86,14 +86,7 @@ def fimware_info_get():
     ic = fileJson['fimwareInfo']['ic']
     ota_image_type = fileJson['fimwareInfo']['ota_image_type']
     model_id = fileJson['fimwareInfo']['model_id']
-    print(len(model_id) + '\n\n')
-    if len(model_id) < 6:
-        model_id = "NULL"
     pid = fileJson['fimwareInfo']['pid']
-    print(len(pid) + '\n\n')
-
-    if len(pid) < 8:
-        pid = "NULL"
     manufacture_name = fileJson['fimwareInfo']['manufacture_name']
     manufacture_id = fileJson['fimwareInfo']['manufacture_id']
     module_name = fileJson['fimwareInfo']['module_name']

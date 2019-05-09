@@ -52,17 +52,18 @@ typedef enum {
 }ZG_DEV_T;
 
 typedef struct {
-    uint32_t next_rejoin_time;
-    uint32_t wake_up_time_after_join;
-    uint8_t  rejoin_try_times;
-    uint8_t  power_on_auto_rejoin_flag;
+    uint32_t next_rejoin_time;          //next rejoin time when rejoin failed. (bet:ms)
+    uint32_t wake_up_time_after_join;   //wakeup time when join success.(for gateway get cluser data) (bet:ms)
+    uint8_t  rejoin_try_times;          //rejoin times when parent lost (bet:ms)
+    bool_t   power_on_auto_rejoin_flag; //auto rejoin when power on
+    bool_t   auto_rejoin_send_data;     //auto rejoin when send data if network status is parent-lost.
 }zg_rejoin_config_t;
 
 typedef struct {
-    uint16_t poll_interval;
-    uint16_t wait_app_ack_time;
-    uint8_t  poll_forever_flag;
-    uint8_t  poll_failed_times;
+    uint16_t poll_interval;     //poll period (bet: ms)
+    uint16_t wait_app_ack_time; //tiemout waitting app ack (bet: ms)
+    bool_t   poll_forever_flag; //TRUE: forever poll 
+    uint8_t  poll_failed_times; //enter parent-lost status when poll failed x times.
 }zg_poll_config_t;
 
 typedef struct {
@@ -77,6 +78,11 @@ typedef struct {
 typedef struct {
     uint8_t reserved;
 }zg_router_config;
+
+typedef enum {
+    ZG_SCAN_POLICY_CURR_CHANNEL_FOREVER = 0, //scan current channel forever when rejoin-scanning.
+    ZG_SCAN_POLICY_CURR_CHANNEL_ONCE         //scan all channel at the last time when rejoin-scanning.
+}ZG_SCAN_POLICY_T;
 
 typedef enum {
     ZB_SCAN_DURATION_0 = 0, //  19.2 ms
@@ -361,6 +367,8 @@ typedef enum {
 #define ATTR_MASK_SINGLETON (0x20)
 // Attribute is a client attribute
 #define ATTR_MASK_CLIENT (0x40)
+// Attribute that has this mask is saved to a token, size limited: 1,2,4,6, fastest token
+#define ATTR_MASK_TOKEN_FAST (0x80)
 
 typedef enum {
     NET_POWER_ON_LEAVE,     //power on and device is not joined network
@@ -672,7 +680,17 @@ typedef enum {
     ATTR_CMD_RET_SUCCESS,
     ATTR_CMD_RET_FAILED
 }ATTR_CMD_RET_T;
-    
+
+typedef enum {
+    ZG_OTA_EVT_DOWNLOAD_AND_VERIFY_SUCCESS = 0,
+    ZG_OTA_EVT_DOWNLOAD_TIME_OUT           = 1,
+    ZG_OTA_EVT_VERIFY_FAILED               = 2,
+    ZG_OTA_EVT_SERVER_ABORTED              = 3,
+    ZG_OTA_EVT_CLIENT_ABORTED              = 4,
+    ZG_OTA_EVT_ERASE_FAILED                = 5,
+    ZG_OTA_EVT_START                       = 6
+}ZG_OTA_EVT_T;
+
 typedef enum {
     QOS_0, //permit loss packages
     QOS_1, //not permit loss packages
@@ -973,6 +991,13 @@ extern void dev_zg_join_config(join_config_t *cfg);
  */
 extern bool_t dev_zigbee_join_start(uint32_t join_timeout);
 
+/**
+ * @description: enable permit join after steering finish. 
+ * @param {type} none
+ * @return: none
+ */
+extern void dev_zg_enable_steering_join_permit(void);
+
 //hardware timer api
 /**
  * @description: hardware timer enable
@@ -1090,6 +1115,14 @@ extern uint8_t gpio_raw_output_read_status(  GPIO_PORT_T port, GPIO_PIN_T pin);
 extern void gpio_raw_output_write_status(  GPIO_PORT_T port, GPIO_PIN_T pin, uint8_t value);
 
 /**
+ * @description: switch output gpio to toggle's status
+  * @param {port} port
+ * @param {pin} pin
+ * @return: none
+ */
+extern void gpio_raw_output_toggle(GPIO_PORT_T port, GPIO_PIN_T pin);
+
+/**
  * @description: read input gpio status with index 
  * @param {i} index
  * @return: current status value
@@ -1154,7 +1187,7 @@ extern void gpio_int_register(gpio_config_t *config, gpio_int_func_t func);
  * @param {len} data length
  * @return: none
  */
-extern void user_flash_data_write(uint8_t *data, uint8_t len);
+extern uint8_t user_flash_data_write(uint8_t *data, uint8_t len);
 
 /**
  * @description: read data from flash 
@@ -1196,6 +1229,42 @@ extern bool_t dev_heartbeat_set(HEARTBEAT_TYPE_E type, uint32_t duration);
 extern void dev_zigbee_leave_for_user(void);
 
 /**
+ * @description: change dev tx power
+ * @param {normal_db} tx power when link is normal 
+ * @param {max_db} tx power when link is not normal
+ * @return: none
+ */
+extern void dev_change_power(int8_t normal_db, int8_t max_db);
+
+/**
+ * @description: rejoin scan channel config
+ * @param {type} poll interval time
+ * @return: none
+ */
+extern void zg_rejoin_scan_policy(ZG_SCAN_POLICY_T type);
+
+/**
+ * @description: change poll interval time(ms)
+ * @param {poll_interval} poll interval time
+ * @return: none
+ */
+extern void zg_poll_interval_change(uint16_t poll_interval);
+
+/**
+ * @description: start poll manual
+ * @param {type} none
+ * @return: none
+ */
+extern void zg_poll_start(void);
+
+/**
+ * @description: stop poll manual
+ * @param {t} none
+ * @return: none
+ */
+ extern void zg_poll_end(void);
+
+/**
  * @description: device wakeup with a time; when timeout, it will be sleep
  * @param {t} wakeup time
  * @return: none
@@ -1204,7 +1273,7 @@ extern void zg_wake_up(uint32_t t); //sleep after t ms
 
 /**
  * @description: device sleep now
- * @param {type} none
+ * @param {void} none
  * @return: none
  */
 extern void zg_sleep(void); //sleep
@@ -1313,10 +1382,10 @@ extern bool_t devGetSceneCallback(uint16_t endpoint, uint16_t* groupId, uint8_t*
 
 /**
  * @description: remove all scenes in scene table of current endpoint; just used by scene control device; default is not remove
- * @param {type} none
+ * @param {endpoint} endpoint
  * @return: true: remove all, false: not remove;
  */
-extern bool_t zigbee_sdk_scene_remove_before_add(void);
+extern bool_t zigbee_sdk_scene_remove_before_add(uint8_t endpoint);
 
 /**
  * @description: scene recall command send
@@ -1325,7 +1394,7 @@ extern bool_t zigbee_sdk_scene_remove_before_add(void);
  * @param {sceneId} scene id
  * @return: none
  */
-extern bool_t dev_scene_recall_send_command(uint16_t endpoint, uint16_t groupId, uint8_t sceneId);
+extern bool_t dev_scene_recall_send_command(uint8_t endpoint, uint16_t groupId, uint8_t sceneId);
 
 #ifdef __cplusplus
 }

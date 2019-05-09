@@ -18,8 +18,8 @@ SDK_DIR = ../../../../sdk
 ifeq ($(PLATFORM), efr32mg13p732gm48)
 ifeq ($(DEBUG_SYMBOLS), TRUE)
 LIB_FILES = $(LIBDIR)/libtuya_sdk_debug.a
--DAPP_DEBUG=1
-CCFLAGS = -g3 \
+CCFLAGS = -DAPP_DEBUG \
+	-g3 \
 	-O0 \
 
 ASMFLAGS = -g3 \	
@@ -41,7 +41,6 @@ TOOL = $(SDK_DIR)/tool
 SOURCE_FILES = \
 $(wildcard ./src/*.c) \
 $(wildcard ./../common/src/*.c) \
-$(wildcard ./serial-protocol/*.c) \
 
 
 CINC = -I./ \
@@ -49,7 +48,6 @@ CINC = -I./ \
 -I./include \
 -I../../common/include \
 -I../../../../include \
--I./serial-protocol \
 
 
 OUTPUT_DIR = ./build
@@ -127,7 +125,6 @@ ELFTOOLFLAGS_S37 = -O srec
 
 all: PROLOGUE $(OBJ_DIRS) $(COBJS) $(ASMOBJS) $(ASMOBJS2)
 	@echo 'Linking...'
-	@echo $(CCFLAGS)
 	@echo 'Building out file: tuya_sdk.out'
 	$(LD) $(GROUP_START) $(LDFLAGS) $(COBJS) $(ASMOBJS) $(ASMOBJS2) $(LIB_FILES) $(GROUP_END) -o $(OUTPUT_DIR)/dev.out
 	@echo ' '
@@ -151,7 +148,7 @@ all: PROLOGUE $(OBJ_DIRS) $(COBJS) $(ASMOBJS) $(ASMOBJS2)
 	@echo 'Building gbl file'
 	$(TOOL)/commander/commander gbl create $(OUTPUT_DIR)/$(TARGET).gbl "--app" $(OUTPUT_DIR)/$(TARGET).s37 --device EFR32MG13P732F512GM48
 	@echo 'Building ota file'
-	$(TOOL)/image-builder/image-builder-linux --create "$(OUTPUT_DIR)/$(TARGET)_OTA_$(STR_VER).bin" --version $(HEX_VER) --manuf-id $(MANUF_ID) --image-type $(OTA_IMAGE_TYPE) --tag-id 0x0000 --tag-file "$(OUTPUT_DIR)/$(TARGET).gbl" --string "EBL $(OUTPUT_DIR)/$(TARGET)"
+	$(TOOL)/image-builder/image-builder-linux --create "$(OUTPUT_DIR)/$(TARGET)_OTA_$(STR_VER).bin" --version $(HEX_VER) --manuf-id $(MANUF_ID) --image-type $(OTA_IMAGE_TYPE) --tag-id 0x0000 --tag-file "$(OUTPUT_DIR)/$(TARGET).gbl" --string "$(TARGET)"
 	
 	@echo 'combine bootloader and app s37 file'
 	$(TOOL)/commander/commander convert $(TOOL)/commander/bootloader-storage-internal-single-512k-ota-combined.s37 $(OUTPUT_DIR)/$(TARGET).s37 --address 0x0 --outfile $(OUTPUT_DIR)/$(TARGET)_QIO_$(STR_VER).s37

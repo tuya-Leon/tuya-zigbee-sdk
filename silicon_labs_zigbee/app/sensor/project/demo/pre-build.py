@@ -8,7 +8,7 @@
 @Copyright: HANGZHOU TUYA INFORMATION TECHNOLOGY CO.,LTD
 @Company: http://www.tuya.com
 @Date: 2019-04-15 10:19:39
-@LastEditTime: 2019-04-25 15:37:43
+@LastEditTime: 2019-04-16 20:14:41
 '''
 
 import sys
@@ -18,6 +18,7 @@ import re
 import json
 import string
 import shutil
+import collections
 
 class uart_cfg:
     def __init__(self):
@@ -79,7 +80,7 @@ def fimware_info_get():
 
     print("fimware information parse start...")
     file = open('package.json', 'rb')
-    fileJson = json.load(file)
+    fileJson = json.load(file, object_pairs_hook=collections.OrderedDict)
     name = fileJson['fimwareInfo']['name']
     description = fileJson['fimwareInfo']['description']
     version = fileJson['fimwareInfo']['version']
@@ -92,7 +93,6 @@ def fimware_info_get():
     module_name = fileJson['fimwareInfo']['module_name']
     file.close()
     print("fimware information parse success")
- 
 
 # version info convert
 def version_info_convert():
@@ -152,10 +152,38 @@ def ato_generate_config_c(*args,**kwargs):
 # generat firmware function in config.c
 def generate_firmware_func_config_c(fileObj):
 
+    fileObj.writelines("#include \"zigbee_sdk.h\"" + '\n')
     fileObj.writelines("#include \"config.h\"" + '\n\n\n')
     fileObj.writelines("char *g_firmware_name = FIRMWARE_NAME;" + '\n')
     fileObj.writelines("uint8_t g_firmware_ver = FIRMWARE_VER;" + '\n' + '\n')
     # fileObj.writelines("char *g_sdk_ver = SDK_VER;" + '\n')
+    global ledInfo, relayInfo, keyInfo
+
+    # print(ledInfo["Enable"], (ledInfo["Num"]))
+    if ledInfo["Enable"] == "true" and int(ledInfo["Num"]) > 0:
+        fileObj.writelines("gpio_config_t gpio_output_config[LED_NUM] = {" + '\n')
+        for index in range(0, ledInfo["Num"]):
+            fileObj.writelines("".ljust(4) + "{" )
+            fileObj.writelines( "LED" + str(index) + "_PORT, ")
+            fileObj.writelines( "LED" + str(index) + "_PIN, ")
+            fileObj.writelines( "LED" + str(index) + "_MODE, ")
+            fileObj.writelines( "LED" + str(index) + "_OUT, ")
+            fileObj.writelines( "LED" + str(index) + "_DRIVER ")
+            fileObj.writelines("}" + "," +  '\n')
+        fileObj.writelines("};" + '\n' + '\n')
+
+    if keyInfo["Enable"] == "true" and int(keyInfo["Num"]) > 0:
+        fileObj.writelines("gpio_config_t gpio_input_config[KEY_NUM] = {" + '\n')
+        for index in range(0, keyInfo["Num"]):
+            fileObj.writelines("".ljust(4) + "{" )
+            fileObj.writelines( "KEY" + str(index) + "_PORT, ")
+            fileObj.writelines( "KEY" + str(index) + "_PIN, ")
+            fileObj.writelines( "KEY" + str(index) + "_MODE, ")
+            fileObj.writelines( "KEY" + str(index) + "_OUT, ")
+            fileObj.writelines( "KEY" + str(index) + "_DRIVER ")
+            fileObj.writelines("}" + "," +  '\n')
+        fileObj.writelines("};" + '\n\n')    
+
     fileObj.writelines("void firmware_config(void)" + '\n')
     fileObj.writelines("{" + '\n')
     fileObj.writelines("    dev_register_base_info(MODEL_ID, PRODUCTOR_ID_PFEFIX, PRODUCTOR_ID);" + '\n')
@@ -189,17 +217,13 @@ def generate_fimware_macro_config_h(fileObj):
     fileObj.writelines("#define PRODUCTOR_ID_PFEFIX".ljust(TABLE_SPACE) + '\"' + manufacture_name + '\"' + '\n')
     fileObj.writelines("#define IC".ljust(TABLE_SPACE) + '\"' + ic + '\"' + '\n')
     fileObj.writelines("#define OTA_IMAGE_TYPE".ljust(TABLE_SPACE) + ota_image_type + '\n')
-    # fileObj.writelines("#define MODEL_ID".ljust(TABLE_SPACE) + '\"' + model_id + '\"' + '\n')
-    # fileObj.writelines("#define PRODUCTOR_ID".ljust(TABLE_SPACE) + '\"' + pid + '\"' + '\n')
     fileObj.writelines("#define MODULE_NAME".ljust(TABLE_SPACE)  + module_name + '\n')
 
-    # print(len(model_id))
     if len(model_id) < 6:
         fileObj.writelines("#define MODEL_ID".ljust(TABLE_SPACE) + "NULL" + '\n')
     else:
         fileObj.writelines("#define MODEL_ID".ljust(TABLE_SPACE) + '\"' + model_id + '\"' + '\n')
 
-    # print(len(pid))
     if len(pid) < 8:
         fileObj.writelines("#define PRODUCTOR_ID".ljust(TABLE_SPACE) + "NULL" + '\n')
     else:
@@ -233,7 +257,7 @@ def generate_uartcfg_macro_config_h(fileObj):
     print("uart config parse start...")
     index = 0
     file = open('package.json', 'rb')
-    fileJson = json.load(file)
+    fileJson = json.load(file,object_pairs_hook=collections.OrderedDict)
     uartEnable = fileJson['uartConfig']['uart_enable']
     uartNum = fileJson['uartConfig']['uart_num']
     file.close()
@@ -287,7 +311,7 @@ def get_io_base_info():
 
     global ledInfo, relayInfo, keyInfo
     file = open('package.json', 'rb')
-    fileJson = json.load(file)
+    fileJson = json.load(file, object_pairs_hook=collections.OrderedDict)
     ioConfigJson = fileJson['ioConfig']
     ledInfo["Enable"] = ioConfigJson['led_enable'] if 'led_enable' in ioConfigJson else "false"
     # print(ledInfo)
@@ -311,6 +335,9 @@ def get_io_config_info(modInfo,fileObj,fileJs):
         fileObj.writelines('\n' + '\n')
         fileObj.writelines("/* io config! */" + '\n')
         fileObj.writelines("/* " + modInfo["Name"] + " config! */" + '\n')
+
+        fileObj.writelines(("#define " + (modInfo["Name"] + "_enable").upper()).ljust(TABLE_SPACE) + modInfo["Enable"] + '\n')
+        fileObj.writelines(("#define " + (modInfo["Name"] + "_num").upper()).ljust(TABLE_SPACE) + str(modInfo["Num"]) + '\n')
 
         outArry = [in_out()] * modInfo["Num"]
         for index in range(0, modInfo["Num"]):
@@ -384,8 +411,8 @@ def toolsConfig(root, target, files):
 if __name__ == '__main__':
     fimware_info_get()
     version_info_convert()
-    ato_generate_config_c("config.c")
     ato_generate_config_h("config.h")
     ato_generate_config_mk("config.mk")
+    ato_generate_config_c("config.c")
     ato_generate_callback_c()
     toolsConfig('../../../../tools', 'arm-none-eabi-gcc', "makefile.conf")

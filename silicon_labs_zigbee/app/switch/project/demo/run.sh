@@ -1,4 +1,5 @@
 #!/bin/bash
+
 if [ $# -lt 1 ]; then
 	echo "command error, please run --help"
 	exit

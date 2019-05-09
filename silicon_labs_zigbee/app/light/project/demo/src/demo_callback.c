@@ -18,13 +18,13 @@
 #include "zigbee_dev_template.h"
 #include "config.h"
 
-// #if (LED_ENABLE == true)
-// extern gpio_config_t gpio_output_config[LED_NUM];
-// #endif
+#if (LED_ENABLE == true)
+extern gpio_config_t gpio_output_config[LED_NUM];
+#endif
 
-// #if (KEY_ENABLE == true)
-// extern gpio_config_t gpio_input_config[KEY_NUM];
-// #endif
+#if (KEY_ENABLE == true)
+extern gpio_config_t gpio_input_config[KEY_NUM];
+#endif
 
 static void dev_key_handle(uint32_t key_id, key_st_t key_st, uint32_t push_time);
 
@@ -43,14 +43,14 @@ void dev_power_on_init(void)
     */
 
     //TODO
-// #if (LED_ENABLE == true)    
-//     gpio_output_init((gpio_config_t *)gpio_output_config, get_array_len(gpio_output_config));
-// #endif
+#if (LED_ENABLE == true)    
+    gpio_output_init((gpio_config_t *)gpio_output_config, get_array_len(gpio_output_config));
+#endif
 
-// #if (KEY_ENABLE == true)
-//     gpio_button_init((gpio_config_t *)gpio_input_config, get_array_len(gpio_input_config), 50, dev_key_handle);
-// #endif
-//     return;
+#if (KEY_ENABLE == true)
+    gpio_button_init((gpio_config_t *)gpio_input_config, get_array_len(gpio_input_config), 50, dev_key_handle);
+#endif
+    return;
 }
 
 /**

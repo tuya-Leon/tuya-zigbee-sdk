@@ -40,7 +40,8 @@ TOOL = $(SDK_DIR)/tool
 # app code
 SOURCE_FILES = \
 $(wildcard ./src/*.c) \
-$(wildcard ./../common/src/*.c) \
+$(wildcard ./../../common/src/*.c) \
+$(wildcard ../../../../tools/gcc_boot/*.c) \
 
 
 CINC = -I./ \
@@ -72,7 +73,9 @@ OBJ_DIRS = $(sort $(dir $(COBJS)) $(dir $(ASMOBJS)) $(dir $(ASMOBJS2)))
 GROUP_START =-Wl,--start-group
 GROUP_END =-Wl,--end-group        
 
-CCFLAGS+= -gdwarf-2 \
+CCFLAGS+= -D__STACK_SIZE=2400 \
+	  -D__HEAP_SIZE=10240 \
+		-gdwarf-2 \
     -mcpu=cortex-m4 \
     -mthumb \
     -std=gnu99 \
@@ -99,22 +102,25 @@ ASMFLAGS+= -gdwarf-2 \
 	-mfpu=fpv4-sp-d16  \
 	-mfloat-abi=softfp
 
+
 LDFLAGS+= -lm \
 	-gdwarf-2 \
 	-mcpu=cortex-m4 \
+	-lgcc \
+	-mcpu=cortex-m4 -specs=nano.specs -specs=nosys.specs \
 	-mthumb -T "$(GLOBAL_BASE_DIR)/hal/micro/cortexm3/efm32/gcc-cfg.ld" \
 	-L"$(GLOBAL_BASE_DIR)/hal/micro/cortexm3/" \
 	-Xlinker --defsym="SIMEEPROM_SIZE=36864" \
 	-Xlinker --defsym="FLASH_SIZE=524288" \
 	-Xlinker --defsym="RAM_SIZE=65536" \
-	-Xlinker --defsym="EMBER_MALLOC_HEAP_SIZE=10240" \
 	-Xlinker --defsym=APP_GECKO_INFO_PAGE_BTL=1 \
 	-Xlinker --gc-sections \
 	-Xlinker -Map="./$(OUTPUT_DIR)/$(TARGET).map" \
 	-mfpu=fpv4-sp-d16 \
-	-mfloat-abi=softfp --specs=nano.specs -u _printf_float \
-	-Wl,--start-group -lgcc -lc -lnosys   -Wl,--end-group \
+	-mfloat-abi=softfp  -u _printf_float \
+	-Wl,--start-group -lc -Wl,--end-group \
 	-Wl,--no-wchar-size-warning \
+
 
 ARCHFLAGS = r
 ELFTOOLFLAGS_BIN = -O binary
@@ -154,7 +160,7 @@ all: PROLOGUE $(OBJ_DIRS) $(COBJS) $(ASMOBJS) $(ASMOBJS2)
 	$(TOOL)/commander/commander convert $(TOOL)/commander/bootloader-storage-internal-single-512k-ota-combined.s37 $(OUTPUT_DIR)/$(TARGET).s37 --address 0x0 --outfile $(OUTPUT_DIR)/$(TARGET)_QIO_$(STR_VER).s37
 	@echo ' '
 	@echo 'Done.'
-
+	rm ../../tools -rf
 
 PROLOGUE:
 #	@echo $(COBJS)

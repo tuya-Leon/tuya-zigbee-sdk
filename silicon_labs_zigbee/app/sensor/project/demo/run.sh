@@ -17,7 +17,7 @@ make_release_func()
 	python ./pre-build.py
 	mv ./config.c ./src/
 	mv ./config.h ./include/
-	make -j8 
+	make -j8
 }
 
 make_debug_func()

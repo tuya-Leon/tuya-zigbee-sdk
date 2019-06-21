@@ -7,7 +7,7 @@
  * @Copyright: HANGZHOU TUYA INFORMATION TECHNOLOGY CO.,LTD
  * @Company: http://www.tuya.com
  * @Date: 2019-03-25 21:41:18
- * @LastEditTime: 2019-04-28 17:08:14
+ * @LastEditTime: 2019-04-15 20:24:42
  */
 
 #ifndef ZIGBEE_DEV_TEMPLATE__H
@@ -36,8 +36,8 @@ extern const uint8_t basic_default_value[];
 
 #define POWER_ATTR_LIST \
     { 0x0000, ATTR_INT16U_ATTRIBUTE_TYPE, 2, (ATTR_MASK_SINGLETON), { (uint8_t*)0x0000UL } }, /* 10 / Power Configuration / mains voltage*/\
-    { 0x0020, ATTR_INT8U_ATTRIBUTE_TYPE, 1, (ATTR_MASK_SINGLETON|ATTR_MASK_TOKENIZE), { (uint8_t*)0x00UL } }, /* 11 / Power Configuration / battery voltage*/\
-    { 0x0021, ATTR_INT8U_ATTRIBUTE_TYPE, 1, (ATTR_MASK_SINGLETON|ATTR_MASK_TOKENIZE), { (uint8_t*)0x00 } }, /* 12 / Power Configuration / battery percentage remaining*/\
+    { 0x0020, ATTR_INT8U_ATTRIBUTE_TYPE, 1, (ATTR_MASK_SINGLETON), { (uint8_t*)0x00UL } }, /* 11 / Power Configuration / battery voltage*/\
+    { 0x0021, ATTR_INT8U_ATTRIBUTE_TYPE, 1, (ATTR_MASK_SINGLETON), { (uint8_t*)0x00 } }, /* 12 / Power Configuration / battery percentage remaining*/\
     { 0xFFFD, ATTR_INT16U_ATTRIBUTE_TYPE, 2, (ATTR_MASK_SINGLETON), { (uint8_t*)0x0001 } }, /* 13 / Power Configuration / cluster revision*/\
 
 
@@ -68,6 +68,10 @@ extern const uint8_t basic_default_value[];
 #define LEVEL_CONTROL_ATTR_LIST \
     { 0x0000, ATTR_INT8U_ATTRIBUTE_TYPE, 1, (ATTR_MASK_WRITABLE), { (uint8_t*)0x00 } }, /* 20 / Level Control / Current Level*/\
 
+#define TIME_ATTR_LIST \
+    { 0x0007, ATTR_INT32U_ATTRIBUTE_TYPE, 4, (ATTR_MASK_SINGLETON), { (uint8_t*)0x00000000 } }, /* 1 / Time / Local time*/\
+
+        
 #define COLOR_CONTROL_ATTR_LIST \
     { 0x0000, ATTR_INT8U_ATTRIBUTE_TYPE, 1, (ATTR_MASK_WRITABLE), { (uint8_t*)0x10 } }, /* 41 / Color Control / current hue*/\
     { 0x0001, ATTR_INT8U_ATTRIBUTE_TYPE, 1, (ATTR_MASK_WRITABLE), { (uint8_t*)0x10 } }, /* 42 / Color Control / current saturation*/\
@@ -152,6 +156,9 @@ extern const uint8_t basic_default_value[];
 
 #define DEF_CLUSTER_LEVEL_CONTROL_CLUSTER_ID(a) \
     { CLUSTER_LEVEL_CONTROL_CLUSTER_ID, (attr_t *)&((a)[0]), get_array_len((a)) },
+
+#define DEF_CLUSTER_TIME_CLUSTER_ID(a) \
+    { CLUSTER_TIME_CLUSTER_ID, (attr_t *)&((a)[0]), get_array_len((a)) },
     
 #define DEF_CLUSTER_COLOR_CONTROL_CLUSTER_ID(a) \
     { CLUSTER_COLOR_CONTROL_CLUSTER_ID, (attr_t *)&((a)[0]), get_array_len((a)) },

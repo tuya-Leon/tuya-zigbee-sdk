@@ -18,30 +18,48 @@ extern "C"
 {
 #endif
 
-#include <stddef.h>
-#include <stdint.h>
+#include "type_def.h"
 
-    //device manufactury test resut status
-    typedef enum
-    {
-        MF_TEST_SUCCESS,
-        MF_TEST_FAILED,
-        MF_TEST_DOING
-    } MF_TEST_RET_T;
+//device manufactury test resut status
+typedef enum
+{
+    MF_TEST_SUCCESS,
+    MF_TEST_FAILED,
+    MF_TEST_DOING
+} MF_TEST_RET_T;
 
-    /**
- * @description: device manufactury test result notify function
- * @param {result} none
- * @return: MF_TEST_RET_T manufactury test resut status
- */
-    extern void dev_mf_noti_result(MF_TEST_RET_T result);
+/**
+* @description: device manufactury test result notify function
+* @param {result} none
+* @return: MF_TEST_RET_T manufactury test resut status
+*/
+extern void dev_mf_noti_result(MF_TEST_RET_T result);
 
-    /**
- * @description: device manufactury test(button test) notify 
- * @param {key_id} manufactury test key id 
- * @return: none
- */
-    extern void dev_mf_button_test_notify(uint32_t key_id);
+/**
+* @description: device manufactury test(button test) notify 
+* @param {key_id} manufactury test key id 
+* @return: none
+*/
+extern void dev_mf_button_test_notify(uint32_t key_id);
+
+
+/**
+* @description: device manufactury test(bool sensor test) notify 
+* @param {sensor_type} sensor type
+* @param {index} sensor index 
+* @param {result} OK:TRUE  ERR:FALSE 
+* @return: none
+*/
+extern void dev_mf_bool_sensor_notify(uint8_t sensor_type, uint8_t index, bool_t result);
+
+/**
+* @description: general send function
+* @param {cmd} test commander
+* @param {len} data's length
+* @param {data} data 
+* @return: none
+*/
+extern void dev_mf_general_send(uint8_t cmd, uint8_t len, uint8_t *data);
 
 #ifdef __cplusplus
 }

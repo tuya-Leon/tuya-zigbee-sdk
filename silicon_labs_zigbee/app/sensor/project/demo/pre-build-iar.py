@@ -1,14 +1,14 @@
 # coding:utf-8
 '''
-@Author: Leon
+@Author: Deven
 @email: 
-@LastEditors: Leon
+@LastEditors: Deven
 @file name: per-build.py
 @Description: auto generate files and set default config 
 @Copyright: HANGZHOU TUYA INFORMATION TECHNOLOGY CO.,LTD
 @Company: http://www.tuya.com
 @Date: 2019-04-15 10:19:39
-@LastEditTime: 2019-04-20 14:41:33
+@LastEditTime: 2019-06-06 11:27:08
 '''
 
 import sys
@@ -18,6 +18,7 @@ import re
 import json
 import string
 import shutil
+import collections
 
 class uart_cfg:
     def __init__(self):
@@ -55,9 +56,11 @@ module_name = ""
 ledArry = list()
 keyArry = list()
 relayArry = list()
+sensorArry = list()
 ledInfo = {"Name":'led', "Enable":'', "Num":''}
 keyInfo = {"Name":'key', "Enable":'', "Num":''}
 relayInfo = {"Name":'relay', "Enable":'', "Num":''}
+sensorInfo = {"Name":'sensor', "Enable":'', "Num":''}
 
 current_path = os.getcwd()+'/'
 callback_file_source_path = "../../../../include/callbacks.c"
@@ -79,7 +82,7 @@ def fimware_info_get():
 
     print("fimware information parse start...")
     file = open('package.json', 'rb')
-    fileJson = json.load(file)
+    fileJson = json.load(file, object_pairs_hook=collections.OrderedDict)
     name = fileJson['fimwareInfo']['name']
     description = fileJson['fimwareInfo']['description']
     version = fileJson['fimwareInfo']['version']
@@ -92,7 +95,6 @@ def fimware_info_get():
     module_name = fileJson['fimwareInfo']['module_name']
     file.close()
     print("fimware information parse success")
- 
 
 # version info convert
 def version_info_convert():
@@ -199,6 +201,8 @@ def generate_iocfg_macro_config_h(fileObj):
     get_io_config_info(ledInfo,fileObj,fileJs)
     get_io_config_info(relayInfo,fileObj,fileJs)
     get_io_config_info(keyInfo,fileObj,fileJs)
+    get_io_config_info(sensorInfo,fileObj,fileJs)
+	
     
 # generate config.mk file
 def ato_generate_config_mk(*args,**kwargs):
@@ -227,7 +231,7 @@ def generate_uartcfg_macro_config_h(fileObj):
     print("uart config parse start...")
     index = 0
     file = open('package.json', 'rb')
-    fileJson = json.load(file)
+    fileJson = json.load(file,object_pairs_hook=collections.OrderedDict)
     uartEnable = fileJson['uartConfig']['uart_enable']
     uartNum = fileJson['uartConfig']['uart_num']
     file.close()
@@ -279,18 +283,20 @@ def generate_uartcfg_macro_config_h(fileObj):
 # get io base info
 def get_io_base_info():
 
-    global ledInfo, relayInfo, keyInfo
+    global ledInfo, relayInfo, keyInfo, sensorInfo
     file = open('package.json', 'rb')
-    fileJson = json.load(file)
+    fileJson = json.load(file, object_pairs_hook=collections.OrderedDict)
     ioConfigJson = fileJson['ioConfig']
-    ledInfo["Enable"] = ioConfigJson['led_enable'] if 'led_enable' in ioConfigJson else "false"
-    # print(ledInfo)
+
     ledInfo["Enable"] = ioConfigJson['led_enable'] if 'led_enable' in ioConfigJson else "false"
     ledInfo["Num"] = ioConfigJson['led_num'] if 'led_enable' in ioConfigJson else "false"
     relayInfo["Enable"] = ioConfigJson['relay_enable'] if 'relay_enable' in ioConfigJson else "false"
     relayInfo["Num"] = ioConfigJson['relay_num'] if 'relay_num' in ioConfigJson else "false"
-    keyInfo["Enable"] = ioConfigJson['key_enable'] if 'led_enable' in ioConfigJson else "false"
-    keyInfo["Num"] = ioConfigJson['key_num'] if 'led_enable' in ioConfigJson else "false"
+
+    keyInfo["Enable"] = ioConfigJson['key_enable'] if 'key_enable' in ioConfigJson else "false"
+    keyInfo["Num"] = ioConfigJson['key_num'] if 'key_enable' in ioConfigJson else "false"
+    sensorInfo["Enable"] = ioConfigJson['sensor_enable'] if 'sensor_enable' in ioConfigJson else "false"
+    sensorInfo["Num"] = ioConfigJson['sensor_num'] if 'sensor_enable' in ioConfigJson else "false"
     file.close()
     # print(ledInfo, relayInfo, keyInfo)
     return fileJson

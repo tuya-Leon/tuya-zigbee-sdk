@@ -16,25 +16,14 @@ extern "C" {
 #include "zigbee_attr.h"
 #include "mf_test_callback.h"
 #include "zigbee_modules.h"
+#include "hal_battery.h"
+
 
 #if defined (__IAR_SYSTEMS_ICC__)
     #define  VIRTUAL_FUNC __weak
 #else
     #define VIRTUAL_FUNC __attribute__((weak))
 #endif
-
-typedef uint8_t bool_t;
-#ifndef TRUE
-#define  TRUE 1
-#endif
-#ifndef FALSE
-#define  FALSE 0
-#endif
-
-#ifndef NULL
-#define NULL ((void *)0)
-#endif
-
 
 #define NEXT_REJOIN_TIME            0 
 #define WAKE_UP_TIME_AFTER_JOIN    30
@@ -54,6 +43,7 @@ typedef enum {
 typedef struct {
     uint32_t next_rejoin_time;          //next rejoin time when rejoin failed. (bet:ms)
     uint32_t wake_up_time_after_join;   //wakeup time when join success.(for gateway get cluser data) (bet:ms)
+    uint32_t wake_up_time_after_rejoin; //wakeup time when rejoin success.(for app use) (bet:ms)
     uint8_t  rejoin_try_times;          //rejoin times when parent lost (bet:ms)
     bool_t   power_on_auto_rejoin_flag; //auto rejoin when power on
     bool_t   auto_rejoin_send_data;     //auto rejoin when send data if network status is parent-lost.
@@ -81,7 +71,7 @@ typedef struct {
 
 typedef enum {
     ZG_SCAN_POLICY_CURR_CHANNEL_FOREVER = 0, //scan current channel forever when rejoin-scanning.
-    ZG_SCAN_POLICY_CURR_CHANNEL_ONCE         //scan all channel at the last time when rejoin-scanning.
+    ZG_SCAN_POLICY_ALL_CHANNEL_ONCE         //scan all channel at the last time when rejoin-scanning.
 }ZG_SCAN_POLICY_T;
 
 typedef enum {
@@ -380,12 +370,13 @@ typedef enum {
     NET_REJOIN_OK,          //network rejoin ok
     NET_REMOTE_LEAVE,       //remove device by remote device
     NET_LOCAL_LEAVE,        //remove device by local
+    NET_MF_TEST_LEAVE,      //remove device by PC test tools
 }NET_EVT_T;
 
 typedef struct {
-    bool_t auto_join_power_on_flag;
-    bool_t auto_join_remote_leave_flag;
-    uint32_t join_timeout;
+    bool_t auto_join_power_on_flag;  //上电是否配网
+    bool_t auto_join_remote_leave_flag; //从app删除设备后是否自动配网
+    uint32_t join_timeout; //join max time. bet:ms
 }join_config_t;
 
 typedef struct {
@@ -761,7 +752,7 @@ typedef enum {
 }ZCL_DATA_DIRECTION_T;
 
 typedef struct {
-    /*real send time delay£ºdelay_time+rand()%random_time*/
+    /*real send time delay��delay_time+rand()%random_time*/
     uint16_t delay_time; //send delay time with ms
     uint16_t random_time;//send random times with ms
     
@@ -826,6 +817,33 @@ typedef struct {
     uint8_t valid_flag;
 }hardware_timer_t;
 
+
+typedef enum {
+    ADC_TYPE_VDD = 0, //capture vdd 
+    ADC_TYPE_PORT_PIN //capture GPIO
+}ADC_TYPE_T;
+
+typedef struct {
+    ADC_TYPE_T adc_type;
+    GPIO_PORT_PIN_T *pos_pin;
+    GPIO_PORT_PIN_T *neg_pin;
+}adc_cfg_t;
+
+typedef struct {
+    uint32_t cap_first_delay_time;          //delay time of first battery percentage capture
+    uint32_t cap_waitting_silence_time;     //time to wait for system silence
+    uint32_t cap_max_period_time;           //maximum capture period
+    uint16_t cap_max_voltage;               //maximum voltage of battery.
+    uint16_t cap_min_voltage;               //minimum voltage of battery.
+    adc_cfg_t adc;
+}battery_cfg_t;
+
+typedef struct {
+    uint16_t voltage;       //battery voltage
+    uint8_t  percent;       //percentage of current battery voltage
+}battery_table_t;
+
+
 typedef enum {
     QUEUE_RET_OK = 0,
     QUEUE_RET_ERR,
@@ -838,19 +856,55 @@ typedef struct
 {
     uint8_t channel;
     uint8_t data_len;
-    uint8_t* data;
+    uint8_t data[50];
     serialMfgRxCallback received_callback;
 }serial_protocol_rf_test_t;
 
+
+
+typedef enum{
+    RESET_REASON_UNKNOWN    = 0, // Underterminable cause
+    RESET_REASON_FIB        = 1, // Reset originated from the FIB bootloader
+    RESET_REASON_BOOTLOADER = 2, // Reset relates to an Ember bootloader
+    RESET_REASON_EXTERNAL   = 3, // External reset trigger
+    RESET_REASON_POWERON    = 4, // Poweron reset type, supply voltage < power-on threshold
+    RESET_REASON_WATCHDOG   = 5, // Watchdog reset occurred
+    RESET_REASON_SOFTWARE   = 6, // Software triggered reset
+    RESET_REASON_CRASH      = 7, // Software crash
+    RESET_REASON_FLASH      = 8, // Flash failure cause reset
+    RESET_REASON_FATAL      = 9, // A non-recoverable fatal error occurred
+    RESET_REASON_FAULT      = 10,// A access fault occurred
+    RESET_REASON_BROWNOUT   = 11,// Brown out
+}RESET_REASON_T;
+
+
 #ifdef APP_DEBUG
 #define app_print(...) uart_printf(UART_ID_UART0, __VA_ARGS__)
+#define APP_PRINT(fmt,...) app_print("%s(%d)-<%s>: "##fmt"\r\n",__FILE__, __LINE__, __FUNCTION__,##__VA_ARGS__)
 #else
 #define app_print(...)
 #endif
 
 #define get_array_len(x) (sizeof(x)/sizeof(x[0]))
 
-//uart api
+/**
+ * @description: get reset info
+ * @param {type} none
+ * @return: RESET_REASON_T
+ */
+extern RESET_REASON_T get_reset_reason(void);
+
+/**
+ * @description: watch dog reload.
+ * @param {type} none
+ * @return: none
+ */
+extern void watchdog_reload(void);
+//******************************************************************************
+//                                                                              
+//                              UART API                                     
+//                                                                              
+//******************************************************************************
 /**
  * @description: user uart init function
  * @param {config} user uart configuration information
@@ -882,7 +936,13 @@ extern void user_uart_disable(UART_ID_T uart_id);
  */
 extern void uart_printf(UART_ID_T uart_id, const char *formatString, ...);
 
-//soft timer api
+
+
+//******************************************************************************
+//                                                                              
+//                              Soft timer API                                       
+//                                                                              
+//******************************************************************************
 typedef void (*timer_func_t)(uint8_t);
 
 /**
@@ -916,7 +976,13 @@ extern void dev_timer_start(uint8_t evt, uint32_t t);
  */
 extern bool_t dev_timer_get_valid_flag(uint8_t evt);
 
-//base tools api
+
+
+//******************************************************************************
+//                                                                              
+//                              base tools api                                  
+//                                                                              
+//******************************************************************************
 /**
  * @description: hex to hexstr convert function
  * @param {type} upper or lower letter
@@ -951,7 +1017,11 @@ extern char *get_dev_firmware_ver(uint8_t ver);
  */
 extern void data_reversal(uint8_t *in_data, uint8_t *out_data, uint16_t len);
 
-//base info register
+//******************************************************************************
+//                                                                              
+//                              base info register                                 
+//                                                                              
+//******************************************************************************
 /**
  * @description: device basic information register function
  * @param {model_id} modle id attribute of basic cluster
@@ -998,7 +1068,18 @@ extern bool_t dev_zigbee_join_start(uint32_t join_timeout);
  */
 extern void dev_zg_enable_steering_join_permit(void);
 
-//hardware timer api
+/**
+ * @description: set all attributes value to default.
+ * @param {typet} none
+ * @return: none
+ */
+extern void dev_attr_recovery(void);
+
+//******************************************************************************
+//                                                                              
+//                              hardware timer api                                      
+//                                                                              
+//******************************************************************************
 /**
  * @description: hardware timer enable
  * @param {type} none
@@ -1052,7 +1133,12 @@ extern void dev_sys_reset(void) ;
  */
 extern void dev_sys_data_send_mac(serial_protocol_rf_test_t* rf_test);
 
-//led api
+
+//******************************************************************************
+//                                                                              
+//                              led api                                 
+//                                                                              
+//******************************************************************************
 #define DEV_LED_BLINK_FOREVER 0xFFFF
 
 /**
@@ -1089,7 +1175,12 @@ extern void dev_led_stop_blink(uint8_t led_index, DEV_IO_ST_T st);
 extern uint8_t dev_led_is_blink(uint8_t led_index);
 #define dev_io_op dev_led_stop_blink
 
-//gpio op
+
+//******************************************************************************
+//                                                                              
+//                              gpio op api                                 
+//                                                                              
+//******************************************************************************
 /**
  * @description: read input gpio status 
  * @param {port} port
@@ -1098,6 +1189,14 @@ extern uint8_t dev_led_is_blink(uint8_t led_index);
  */
 extern uint8_t gpio_raw_input_read_status( GPIO_PORT_T port, GPIO_PIN_T pin);
 
+
+/**
+ * @description: config a pin as output
+ * @param {port} port
+ * @param {pin} pin
+ * @return: none
+ */
+extern void gpio_raw_init(gpio_config_t pin);
 /**
  * @description: read output gpio status
   * @param {port} port
@@ -1180,7 +1279,111 @@ extern void gpio_output_init(gpio_config_t *config, uint8_t sum);
  */
 extern void gpio_int_register(gpio_config_t *config, gpio_int_func_t func);
 
-//flash api
+/**
+ * @description: gpio interrupt enable
+ * @param {port} GPIO port
+ * @param {pin} GPIO pin
+ * @return: none
+ */
+extern void gpio_int_enable(GPIO_PORT_T port, GPIO_PIN_T pin);
+
+/**
+ * @description: gpio interrupt disable
+ * @param {port} GPIO port
+ * @param {pin} GPIO pin
+ * @return: none
+ */
+extern void gpio_int_disable(GPIO_PORT_T port, GPIO_PIN_T pin);
+
+/**
+ * @description: config ADC pin
+ * @param {ADC_TYPE_T} ADC capture type
+ * @param {pos_pin} ADC pin
+ * @param {neg_pin} negative ADC pin
+ * @return: none
+ */
+extern void hal_adc_init(ADC_TYPE_T adc_type, GPIO_PORT_PIN_T *pos_pin, GPIO_PORT_PIN_T *neg_pin);
+
+/**
+ * @description: ADC start capture, return MAX value is 4095(12bits), basic voltage 5V
+ * @param {void} 
+ * @return: ADC value
+ */
+extern uint16_t hal_adc_get_value(void);
+
+/**
+ * @description: translate adc to voltage.
+ * @param {adv_value} value of hal_adc_get_value.
+ * @return: real voltage*1000
+ */
+extern uint16_t hal_adc_to_voltage(uint16_t adv_value);
+
+
+/**
+* @description: input battery characteristic to system. 
+* @param {cfg} battery capture parameters 
+* @param {table} battery voltage characteristic table. 
+* @param {table_sums} number of table records.
+* @return: none
+*/
+extern void hal_battery_config(battery_cfg_t *cfg, battery_table_t *table, uint8_t table_sums);
+
+//******************************************************************************
+//                                                                              
+//                              flash api                              
+//                                                                              
+//******************************************************************************
+#define FLASH_ADDR_START    0x0000
+#define FLASH_TOTAL_SIZE    4000
+#define FLASH_BLOCK_SIZE    250
+
+typedef enum {
+    FLASH_BLOCK_1 = 0,
+    FLASH_BLOCK_2,
+    FLASH_BLOCK_3,
+    FLASH_BLOCK_4,
+    FLASH_BLOCK_5,
+    FLASH_BLOCK_6,
+    FLASH_BLOCK_7,
+    FLASH_BLOCK_8,
+    FLASH_BLOCK_9,
+    FLASH_BLOCK_10,
+    FLASH_BLOCK_11,
+    FLASH_BLOCK_12,
+    FLASH_BLOCK_13,
+    FLASH_BLOCK_14,
+    FLASH_BLOCK_15,
+    FLASH_BLOCK_16,
+}FLASH_BLOCK_T;
+
+extern uint16_t flash_block_raw_write(FLASH_BLOCK_T block_id, uint8_t *data, uint16_t len);
+extern uint16_t flash_block_raw_read(FLASH_BLOCK_T block_id, uint8_t *data, uint16_t len);
+extern uint16_t flash_addr_raw_write(uint16_t addr, uint8_t *data, uint16_t len);
+extern uint16_t flash_addr_raw_read(uint16_t addr, uint8_t *data, uint16_t len);
+
+
+typedef struct {
+    uint16_t flash_start_addr; //[FLASH_ADDR_START, FLASH_TOTAL_SIZE-1]
+    uint16_t items;
+    uint16_t item_size;
+}dev_record_cfg_t;
+
+typedef enum {
+    RECORD_RET_SUCCESS = 0,
+    RECORD_RET_ERR,
+    RECORD_RET_SPACE_ERR,
+}RECORD_RET_T;
+
+typedef int record_fd_t;
+
+extern record_fd_t dev_record_init(dev_record_cfg_t *cfg);
+extern RECORD_RET_T dev_record_push(record_fd_t fd, void *record, uint16_t size);
+extern RECORD_RET_T dev_record_pop(record_fd_t fd, void *record, uint16_t size);
+extern RECORD_RET_T dev_record_get(record_fd_t fd, void *record, uint16_t size);
+extern uint16_t dev_record_get_used(record_fd_t fd);
+extern uint16_t dev_record_get_capacity    (record_fd_t fd);
+extern void dev_record_clear_all(record_fd_t fd); //clear all record
+
 /**
  * @description: write data to flash
  * @param {data} data
@@ -1202,16 +1405,32 @@ extern uint8_t user_flash_data_read(uint8_t *data, uint8_t len);
  * @param {type} none
  * @return: current network state
  */
+
+
+//******************************************************************************
+//                                                                              
+//                              zigbee api                              
+//                                                                              
+//******************************************************************************
 extern NET_EVT_T nwk_state_get(void);
 
 /**
  * @description: zigbee data send function
  * @param {send_data} data information need to be send
  * @param {fun} data send callback
- *  @param {send_timeout} data send timeout
+ * @param {send_timeout} data send timeout
  * @return: none
  */
 extern void dev_zigbee_send_data(dev_send_data_t *send_data, send_result_func_t fun, uint32_t send_timeout);
+
+/**
+ * @description: clear sepcific cmd send queue,
+ * @param {zcl_id} zcl serial number.
+ * @param {dest_ep} destination endpoint
+ * @param {cluster_id} specific cluster id
+ * @return: none
+ */
+extern void dev_zigbee_specific_response_handle(uint8_t zcl_id, uint8_t dest_ep, uint16_t cluster_id);
 
 /**
  * @description: device heartbeat type and duration set
@@ -1220,6 +1439,13 @@ extern void dev_zigbee_send_data(dev_send_data_t *send_data, send_result_func_t 
  * @return: none
  */
 extern bool_t dev_heartbeat_set(HEARTBEAT_TYPE_E type, uint32_t duration);
+
+/**
+ * @description: delay bearbeat by user call
+ * @param {delay_time} delay time(ms)
+ * @return: none
+ */
+extern void dev_heartbeat_delay_ms(uint32_t delay_time);
 
 /**
  * @description: device leave by user
@@ -1284,6 +1510,15 @@ extern void zg_sleep(void); //sleep
  * @return: none
  */
 extern void zg_rejoin_manual(void);
+
+
+/**
+ * @description: zigbee data will be send soon
+ * @param {type} none
+ * @return: none
+ */
+extern bool_t zg_is_busy(void);
+
 
 /**
  * @description: zigbee attribute write function
@@ -1395,6 +1630,110 @@ extern bool_t zigbee_sdk_scene_remove_before_add(uint8_t endpoint);
  * @return: none
  */
 extern bool_t dev_scene_recall_send_command(uint8_t endpoint, uint16_t groupId, uint8_t sceneId);
+
+
+//******************************************************************************                                                                      
+//                              pwm api    
+// user should call hal_pwm_init() first to initialize the pwm module.
+// if you want to set duty_cycle with specific resolution, follow steps bellow:
+// 1.uint16_t max_value = get_max_pwm_value();
+// 2.uint16_t value = x * max_value/256;
+// 3.set_pwm_value(value);
+// thus, resolution = 256, and duty_cycle is x/256
+//         
+// if you want to set duty_cycle with resolution 1%, you just neet to call the 
+// API:set_pwm_duty().
+//                                                       
+//******************************************************************************
+typedef struct{
+    GPIO_PORT_T port;
+    GPIO_PIN_T pin;
+    GPIO_LEVEL_T lv;
+    bool_t invert;
+}pwm_gpio_t;
+/**
+ * @description: pwm init 
+ * @param {config} pwm pins config
+ * @param {sum} pwm channel want to be init
+ * @param {pwm_freq} pwm frequency
+ * @return: 1:success, 0: failed
+ */
+uint8_t hal_pwm_init(pwm_gpio_t *config, uint8_t sum, uint16_t pwm_freq);
+
+/**
+ * @description: set pwm value, duty_cycle = value/max_value
+ * @param {index} choose pwn channel
+ * @param {value} value to be set
+ * @return: 1:success, 0: failed
+ */
+uint8_t set_pwm_value(uint8_t index, uint16_t value);
+
+/**
+ * @description: get max pwm value 
+ * @param {none} 
+ * @return: max pwm value 
+ */
+uint16_t get_max_pwm_value(void);
+
+/**
+ * @description: get max pwm value 
+ * @param {none} 
+ * @return: max pwm value 
+ */
+uint8_t set_pwm_duty(uint8_t index, uint16_t duty, uint16_t precision);
+
+
+//******************************************************************************
+//                                                                              
+//                              soft i2c                               
+//                                                                              
+//******************************************************************************
+typedef struct{
+    GPIO_PORT_PIN_T scl; //scl pin config
+    GPIO_PORT_PIN_T sda; //sda pin config
+    GPIO_PORT_PIN_T power; //iic slave device power control pin config
+    bool_t power_pin_enable; //enable/disable iic slave device power control
+}i2c_gpio_t;
+
+bool_t hal_i2c_init(i2c_gpio_t *config, uint8_t iic_id);
+bool_t hal_i2c_start(uint8_t iic_id);
+bool_t hal_i2c_stop(uint8_t iic_id);
+bool_t hal_i2c_check_ack(uint8_t iic_id);
+void hal_i2c_send_byte(uint8_t iic_id, uint8_t data);
+void hal_i2c_power_enable(uint8_t iic_id);
+void hal_i2c_power_disable(uint8_t iic_id);
+
+/*********************************************/
+// APIs for custom iic protocol
+void hal_i2c_set_sda_high(uint8_t iic_id);
+void hal_i2c_set_sda_low(uint8_t iic_id);
+uint8_t hal_i2c_get_sda_value(uint8_t iic_id);
+void hal_i2c_set_scl_high(uint8_t iic_id);
+void hal_i2c_set_scl_low(uint8_t iic_id);
+uint8_t hal_i2c_get_scl_value(uint8_t iic_id);
+void hal_i2c_set_power_high(uint8_t iic_id);
+void hal_i2c_set_power_low(uint8_t iic_id);
+uint8_t hal_i2c_get_power_value(uint8_t iic_id);
+// APIs for custom iic protocol end
+/*********************************************/
+void set_uart_rx_wakeup_flag(bool_t flag);
+void device_mac_get(Device_Mac_64 returnEui64);
+
+/*********************************************/
+// APIs for Time Cluster Sync
+typedef struct {
+  uint16_t year;
+  uint8_t month;
+  uint8_t day;
+  uint8_t hours;
+  uint8_t minutes;
+  uint8_t seconds;
+} DeviceTimeStruct_t;
+void SetReadTimePeriod(uint32_t TimePeriod);
+uint32_t  GetCurrentTime(void);
+void GetCurrentTimeStruct(DeviceTimeStruct_t *DeviceTime);
+// APIs for Time Cluster Sync end
+/*********************************************/
 
 #ifdef __cplusplus
 }

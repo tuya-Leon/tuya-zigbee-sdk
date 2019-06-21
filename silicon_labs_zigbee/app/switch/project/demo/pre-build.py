@@ -8,7 +8,7 @@
 @Copyright: HANGZHOU TUYA INFORMATION TECHNOLOGY CO.,LTD
 @Company: http://www.tuya.com
 @Date: 2019-04-15 10:19:39
-@LastEditTime: 2019-04-16 20:14:41
+@LastEditTime: 2019-04-25 14:18:04
 '''
 
 import sys
@@ -152,38 +152,10 @@ def ato_generate_config_c(*args,**kwargs):
 # generat firmware function in config.c
 def generate_firmware_func_config_c(fileObj):
 
-    fileObj.writelines("#include \"zigbee_sdk.h\"" + '\n')
     fileObj.writelines("#include \"config.h\"" + '\n\n\n')
     fileObj.writelines("char *g_firmware_name = FIRMWARE_NAME;" + '\n')
     fileObj.writelines("uint8_t g_firmware_ver = FIRMWARE_VER;" + '\n' + '\n')
     # fileObj.writelines("char *g_sdk_ver = SDK_VER;" + '\n')
-    global ledInfo, relayInfo, keyInfo
-
-    # print(ledInfo["Enable"], (ledInfo["Num"]))
-    if ledInfo["Enable"] == "true" and int(ledInfo["Num"]) > 0:
-        fileObj.writelines("gpio_config_t gpio_output_config[LED_NUM] = {" + '\n')
-        for index in range(0, ledInfo["Num"]):
-            fileObj.writelines("".ljust(4) + "{" )
-            fileObj.writelines( "LED" + str(index) + "_PORT, ")
-            fileObj.writelines( "LED" + str(index) + "_PIN, ")
-            fileObj.writelines( "LED" + str(index) + "_MODE, ")
-            fileObj.writelines( "LED" + str(index) + "_OUT, ")
-            fileObj.writelines( "LED" + str(index) + "_DRIVER ")
-            fileObj.writelines("}" + "," +  '\n')
-        fileObj.writelines("};" + '\n' + '\n')
-
-    if keyInfo["Enable"] == "true" and int(keyInfo["Num"]) > 0:
-        fileObj.writelines("gpio_config_t gpio_input_config[KEY_NUM] = {" + '\n')
-        for index in range(0, keyInfo["Num"]):
-            fileObj.writelines("".ljust(4) + "{" )
-            fileObj.writelines( "KEY" + str(index) + "_PORT, ")
-            fileObj.writelines( "KEY" + str(index) + "_PIN, ")
-            fileObj.writelines( "KEY" + str(index) + "_MODE, ")
-            fileObj.writelines( "KEY" + str(index) + "_OUT, ")
-            fileObj.writelines( "KEY" + str(index) + "_DRIVER ")
-            fileObj.writelines("}" + "," +  '\n')
-        fileObj.writelines("};" + '\n\n')    
-
     fileObj.writelines("void firmware_config(void)" + '\n')
     fileObj.writelines("{" + '\n')
     fileObj.writelines("    dev_register_base_info(MODEL_ID, PRODUCTOR_ID_PFEFIX, PRODUCTOR_ID);" + '\n')

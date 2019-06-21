@@ -8,7 +8,7 @@
 @Copyright: HANGZHOU TUYA INFORMATION TECHNOLOGY CO.,LTD
 @Company: http://www.tuya.com
 @Date: 2019-04-15 10:19:39
-@LastEditTime: 2019-04-20 14:41:33
+@LastEditTime: 2019-04-25 15:15:57
 '''
 
 import sys

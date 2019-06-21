@@ -13,7 +13,7 @@ make_clean_func()
 
 make_release_func()
 {
-	echo "build..."
+	echo "build release..."
 	python ./pre-build.py
 	mv ./config.c ./src/
 	mv ./config.h ./include/
@@ -22,7 +22,7 @@ make_release_func()
 
 make_debug_func()
 {
-	echo "build..."
+	echo "build debug..."
 	python ./pre-build.py
 	mv ./config.c ./src/
 	mv ./config.h ./include/

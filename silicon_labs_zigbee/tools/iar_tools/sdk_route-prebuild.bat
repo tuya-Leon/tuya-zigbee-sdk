@@ -20,5 +20,5 @@ SET ver_header_file=%IAR_PROJECT_DIR%\dev_version.h
 ::python %IAR_PROJECT_DIR%\..\..\..\..\tools\pre-build-iar.py
 python %IAR_PROJECT_DIR%\pre-build-iar.py
 move /Y config.c %IAR_PROJECT_DIR%\src\config.c
-
+move /Y config.h %IAR_PROJECT_DIR%\include\config.h
 

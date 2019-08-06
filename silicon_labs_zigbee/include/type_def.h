@@ -54,4 +54,3 @@ typedef uint8_t Device_Mac_64[8];
 #endif /* __cplusplus */
 
 #endif
-

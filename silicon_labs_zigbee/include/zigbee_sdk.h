@@ -371,6 +371,8 @@ typedef enum {
     NET_REMOTE_LEAVE,       //remove device by remote device
     NET_LOCAL_LEAVE,        //remove device by local
     NET_MF_TEST_LEAVE,      //remove device by PC test tools
+    NET_ZLL_JOINED,         //network joined zll network
+    NET_ZLL_LEAVE,          //remove device Zll Reset To Factory New
 }NET_EVT_T;
 
 typedef struct {
@@ -683,8 +685,10 @@ typedef enum {
 }ZG_OTA_EVT_T;
 
 typedef enum {
-    QOS_0, //permit loss packages
-    QOS_1, //not permit loss packages
+    QOS_0,     //permit loss packages
+    QOS_1,     //not permit loss packages
+    QOS_VIP_0, //send first, permit loss packages
+    QOS_VIP_1, //send first, not permit loss packages
 }SEND_QOS_T;
 
 typedef enum {
@@ -772,6 +776,12 @@ typedef struct {
     SEND_ST_T st;
     dev_send_data_t send_data;
 }zck_ack_t;
+
+typedef enum {
+    ZG_CLEAR_ALL_DATA = 0,
+    ZG_CLEAR_LATEST_DATA,
+    ZG_CLEAR_ALL_SAME_DATA,
+}ZG_CLEAR_TYPE_T;
 
 typedef void (*send_result_func_t)(SEND_ST_T, dev_send_data_t *);
 
@@ -877,6 +887,17 @@ typedef enum{
     RESET_REASON_BROWNOUT   = 11,// Brown out
 }RESET_REASON_T;
 
+typedef enum
+{
+    ERROR_CODE_IDLE = 0, // idle state
+    /*1-15 is used by sdk*/
+    ERROR_CODE_ABNORMAL_RESET = 16, // device reset
+    ERROR_CODE_PARENT_LOST = 17, // device parent lost
+    ERROR_CODE_NWK_LEAVE_SELF  = 18, // device leave network by itself
+    ERROR_CODE_NWK_LEAVE_GW  = 19, // device leave network by remote command, such as gateway or it's parent
+    ERROR_CODE_IO_ERROR  = 20,  // GPIO input or output error
+    ERROR_CODE_MEM_ASSERT  = 21,  // memory assert error
+}DEV_ERROR_CODE_E;
 
 #ifdef APP_DEBUG
 #define app_print(...) uart_printf(UART_ID_UART0, __VA_ARGS__)
@@ -976,7 +997,13 @@ extern void dev_timer_start(uint8_t evt, uint32_t t);
  */
 extern bool_t dev_timer_get_valid_flag(uint8_t evt);
 
-
+/**
+ * @description: The amount of milliseconds remaining before the event is
+ *               scheduled to run. If the event is inactive, 0xFFFFFFFF is returned.
+ * @param {evt} event id
+ * @return: The amount of milliseconds remaining
+ */
+extern uint32_t dev_timer_get_remaining_time(uint8_t evt);
 
 //******************************************************************************
 //                                                                              
@@ -1060,6 +1087,13 @@ extern void dev_zg_join_config(join_config_t *cfg);
  * @return: true or false
  */
 extern bool_t dev_zigbee_join_start(uint32_t join_timeout);
+
+/**
+ * @description: stop join, throw JOIN_START_ITMEOUT to nwk_state_changed_callback
+ * @param {void}
+ * @return: void
+ */
+extern void dev_zigbee_join_stop(void);
 
 /**
  * @description: enable permit join after steering finish. 
@@ -1333,12 +1367,12 @@ extern void hal_battery_config(battery_cfg_t *cfg, battery_table_t *table, uint8
 //                              flash api                              
 //                                                                              
 //******************************************************************************
-#define FLASH_ADDR_START    0x0000
+#define FLASH_ADDR_START    (0x0000+250)
 #define FLASH_TOTAL_SIZE    4000
 #define FLASH_BLOCK_SIZE    250
 
 typedef enum {
-    FLASH_BLOCK_1 = 0,
+    FLASH_BLOCK_1 = 1,
     FLASH_BLOCK_2,
     FLASH_BLOCK_3,
     FLASH_BLOCK_4,
@@ -1423,6 +1457,13 @@ extern NET_EVT_T nwk_state_get(void);
  */
 extern void dev_zigbee_send_data(dev_send_data_t *send_data, send_result_func_t fun, uint32_t send_timeout);
 
+/**
+ * @description: clear zigbee data waitting send.
+ * @param {type} enum
+ * @param {args} reserved
+ * @return: none
+ */
+extern void dev_zigbee_clear_send_data(ZG_CLEAR_TYPE_T type, void *args);
 /**
  * @description: clear sepcific cmd send queue,
  * @param {zcl_id} zcl serial number.
@@ -1716,11 +1757,159 @@ void hal_i2c_set_power_low(uint8_t iic_id);
 uint8_t hal_i2c_get_power_value(uint8_t iic_id);
 // APIs for custom iic protocol end
 /*********************************************/
+
+/*********************************************/
+// APIs for spi driver
+/// SPI driver instance type.
+typedef enum {
+  SPI_MASTER = 0,               ///< Act as an SPI master.
+  SPI_SLAVE  = 1                ///< Act as an SPI slave.
+} SPI_TYPE_T;
+
+/// SPI bus bit order.
+typedef enum {
+  SPI_LSB_FIRST = 0,     ///< LSB bit is transmitted first.
+  SPI_MSB_FIRST = 1      ///< MSB bit is transmitted first.
+} SPI_BIT_ORDER_T;
+
+/// SPI clock mode (clock polarity and phase).
+typedef enum {
+  SPI_CLOCK_MODE0  = 0,           ///< SPI mode 0: CLKPOL=0, CLKPHA=0.
+  SPI_CLOCK_MODE1  = 1,           ///< SPI mode 1: CLKPOL=0, CLKPHA=1.
+  SPI_CLOCK_MODE2  = 2,           ///< SPI mode 2: CLKPOL=1, CLKPHA=0.
+  SPI_CLOCK_MODE3  = 3            ///< SPI mode 3: CLKPOL=1, CLKPHA=1.
+} SPI_CLOCK_MODE_T;
+
+/// SPI master chip select (CS) control scheme.
+typedef enum {
+  SPI_CS_CONTROL_AUTO  = 0,        ///< CS controlled by the SPI driver.
+  SPI_CS_CONTROL_APP  = 1  ///< CS controlled by the application.
+} SPI_CSCONTROL_T ;
+
+/// SPI slave transfer start scheme.
+typedef enum {
+  SPI_SLAVE_START_IMMEDIATE  = 0,  ///< Transfer starts immediately.
+  SPI_SLAVE_START_DELAYED  = 1     ///< Transfer starts when the bus is idle (CS deasserted).
+} SPI_SLAVE_START_T ;
+
+/// SPI frame length .
+typedef enum {
+  SPI_FRAME4  = 4,  
+  SPI_FRAME5  = 5,   
+  SPI_FRAME6  = 6,
+  SPI_FRAME7  = 7,
+  SPI_FRAME8  = 8,
+  SPI_FRAME9  = 9,
+  SPI_FRAME10  = 10,
+  SPI_FRAME11  = 11,
+  SPI_FRAME12  = 12,
+  SPI_FRAME13  = 13,
+  SPI_FRAME14  = 14,
+  SPI_FRAME15  = 15,
+  SPI_FRAME16  = 16
+} SPI_FRAME_LENGTH_T;
+
+
+/// An SPI driver instance initialization structure.
+typedef struct {
+  UART_ID_T           port_id;            ///< The USART used for SPI.
+  GPIO_LOC_T          port_mosi_loc;   ///< A location number for the SPI Tx pin.
+  GPIO_LOC_T          port_miso_loc;   ///< A location number for the SPI Rx pin.
+  GPIO_LOC_T          port_clk_loc;  ///< A location number for the SPI Clk pin.
+  GPIO_LOC_T          port_cs_loc;   ///< A location number for the SPI Cs pin.
+  GPIO_PORT_PIN_T     cs;
+  uint32_t            bitRate;          ///< An SPI bitrate.
+  SPI_FRAME_LENGTH_T  frame_length;      ///< An SPI framelength, valid numbers are 4..16
+  SPI_TYPE_T          type;             ///< An SPI type, master or slave.
+  SPI_BIT_ORDER_T     bit_order;         ///< A bit order on the SPI bus, MSB or LSB first.
+  SPI_CLOCK_MODE_T    clock_mode;        ///< SPI mode, CLKPOL/CLKPHASE setting.
+  SPI_CSCONTROL_T     cs_control;        ///< A select master mode chip select (CS) control scheme.
+  SPI_SLAVE_START_T   slave_start_mode;   ///< A slave mode transfer start scheme.
+} spi_init_config_t ;
+
+// Configuration data for SPI Master Init
+#define DEFAULT_SPI_CONFIG                                                     \
+  {                                                                    \
+    UART_ID_UART1,          /* USART port                       */ \
+    LOC_23,                 /* USART Tx/MOSI pin location number default PD15 */ \
+    LOC_4,                  /* USART Rx/MISO pin location number default PA5 */ \
+    LOC_0,                  /* USART Clk pin location number default PA2*/ \
+    LOC_23,                 /* USART Cs pin location number  default PF2*/ \
+    {PORT_F, PIN_2},\
+    50000,                  /* Bitrate                          */ \
+    SPI_FRAME8,             /* Frame length                     */ \
+    SPI_MASTER,             /* SPI mode                         */ \
+    SPI_MSB_FIRST,          /* Bit order on bus                 */ \
+    SPI_CLOCK_MODE0,        /* SPI clock/phase mode             */ \
+    SPI_CS_CONTROL_APP,     /* CS controlled by aplication      */ \
+    SPI_SLAVE_START_IMMEDIATE   /* Slave start transfers immediately*/ \
+  }
+/***************************************************************************//**
+ * @brief Initializes the SPI communication peripheral.
+ * @param spi_config - spi initializes parameters
+ * @return success 1  failed 0.
+
+*******************************************************************************/
+bool_t spi_init_config(spi_init_config_t *spi_config);
+/*****************************************************************************
+ * @brief SPI deinit 
+ *
+ * @param none.
+ * @return none.
+*******************************************************************************/
+void spi_deinit(void);
+
+/*****************************************************************************
+ * @brief SPI Writes and read data 
+ *
+ * @param data_len - write data len.
+ * @param data_buffer - spi write data 
+ * @return none.
+*******************************************************************************/
+void spi_write_data(uint8_t data_len,uint8_t data_buffer[]);
+
+/*****************************************************************************
+ * @brief SPI read data 
+ *
+ * @param data_len - read data len.
+ * @param data_buffer - spi read data 
+ * @return none.
+*******************************************************************************/
+void spi_read_data(uint8_t data_len,uint8_t data_buffer[]);
+
+/*****************************************************************************
+ * @brief SPI Writes and read data 
+ *
+ * @param write_data_len - write data len.
+ * @param write_data_buffer - spi write data 
+ * @param read_data_len - read data len.
+ * @param read_data_buffer - spi read data 
+ * @return none.
+*******************************************************************************/
+
+void spi_write_and_read_data(uint8_t write_data_len,uint8_t write_data_buffer[],\
+                                        uint8_t read_data_len,uint8_t read_data_buffer[]);
+
+
+// APIs  for spi driver
+/*********************************************/
+
 void set_uart_rx_wakeup_flag(bool_t flag);
+
+/**
+ * @description: device mac address get function
+ * @param {returnEui64} 8 bytes mac address
+ * @return: none
+ */
 void device_mac_get(Device_Mac_64 returnEui64);
 
 /*********************************************/
 // APIs for Time Cluster Sync
+
+/**
+ * @description: zigbee time struct 
+ */
+
 typedef struct {
   uint16_t year;
   uint8_t month;
@@ -1728,20 +1917,138 @@ typedef struct {
   uint8_t hours;
   uint8_t minutes;
   uint8_t seconds;
-} DeviceTimeStruct_t;
-void SetReadTimePeriod(uint32_t TimePeriod);
-uint32_t  GetCurrentTime(void);
-void GetCurrentTimeStruct(DeviceTimeStruct_t *DeviceTime);
+} device_time_struct_t;
+
+/**
+ * @description: set time period for device get time form gateway
+ * @param {time_period} time period  (unit: ms) ,default time (30 * 60 *1000 ms) 
+ * @return: none
+ */
+
+void set_read_time_period(uint32_t time_period);
+
+/**
+ * @description: get device current time (unit:S)
+ * @param none
+ * @return: device current time (unit:S)
+ */
+uint32_t  get_current_time(void);
+
+
+/**
+ * @description: get device current time with convert time struct
+ * @param {device_time} time struct with yeah ,month,day,hour,minute,second
+ * @return: none
+ */
+void get_current_time_struct(device_time_struct_t *device_time);
 // APIs for Time Cluster Sync end
 /*********************************************/
 
+/*********************************************/
+// APIs for ZLL
+/**
+ * @description: device create distributed network
+ * @param {none} 
+ * @return: 1:success, 0: failed
+ */
+bool_t zll_create_distributed_network(void);
+/**
+ * @description: The identify request command callback is used to request that
+ *      the recipient identifies itself in some application specific way to aid with touchlinking
+ * @param {durationS} (unit:S)
+ *          0x0000 Exit identify mode
+ *          0x0001 - 0xfffe Number of seconds to remain in identify mode
+ *          0xffff Remain in identify mode for a default time known by the receiver
+ * @return: none
+ */
+void zll_server_identify_callback(uint16_t durationS);
+/**
+ * @description: zll Server joined a new network with touchlink 
+ * @param {panId} the new network panid
+ * @return: none 
+ */
+void zll_Server_touchlink_joined(uint16_t panId );
+/**
+ * @description: zll Server leave network with touchlink
+ * @param {none} 
+ * @return: none
+ */
+void zll_Server_touchlink_leave(void);
+// APIs for ZLL end
+/*********************************************/
+
+//******************************************************************************
+//                                                                              
+//                               hardware i2c                                   
+//                                                                              
+//******************************************************************************
+typedef enum {
+    I2C0_M = 0,
+}HARDWARE_I2C_TYPE_M;
+
+typedef enum {
+    I2C0_FREQ_10_KHz_M = 0,
+    I2C0_FREQ_40_KHz_M,
+    I2C0_FREQ_100_KHz_M,
+}HARDWARE_I2C_FREQ_M;
+
+typedef struct{
+    HARDWARE_I2C_TYPE_M i2c; //scl type config
+
+    GPIO_PORT_T scl_port; //scl pin config
+    GPIO_PIN_T scl_pin;
+    uint8_t scl_location;
+
+    GPIO_PORT_T sda_port; //scl pin config
+    GPIO_PIN_T sda_pin;
+    uint8_t sda_location;
+
+    HARDWARE_I2C_FREQ_M i2c_freq; //i2c freq
+}hardware_i2c_config_t;
+
+/*********************************************/
+// APIs for custom hardware iic protocol
+void hal_hardware_i2c_init(hardware_i2c_config_t *set_i2cConfig);
+int8_t hal_hardware_i2c_write_bytes(uint8_t address, uint8_t *buffer, uint8_t count);
+int8_t hal_hardware_i2c_write_bytes_delay(uint8_t address, const uint8_t *buffer, uint8_t count, uint8_t delay);
+int8_t hal_hardware_i2c_read_bytes(uint8_t address, uint8_t *buffer, uint8_t count);
+
+// APIs for custom hardware iic protocol end
+/*********************************************/
+
+/**
+ * @description: device error code set function, when device is run with something, 
+ * application should use this function to story the error code to flash, when reconnect
+ * to the gateway, the error code will be report to gateway.
+ * @param {err_code} DEV_ERROR_CODE_E: error code
+ * @return: true or false
+ */
+bool_t dev_error_code_set(DEV_ERROR_CODE_E err_code);
+
+
+typedef enum {
+    CALLBACK_TYPE_REPORT_BATTERY = 0,
+}CALLBACK_TYPE_T;
+
+typedef struct {
+    uint16_t report_voltage;
+    uint16_t real_voltage;
+    uint8_t  report_percent;
+    uint8_t  real_percent;
+}cb_battery_args_t;
+
+typedef struct {
+    CALLBACK_TYPE_T type;
+    union {
+        cb_battery_args_t battery;
+    }args;
+}cb_args_t;
+
+typedef void (*sdk_evt_callback_fun_t)(cb_args_t *args);
+
+extern void sdk_cb_register(CALLBACK_TYPE_T type, sdk_evt_callback_fun_t func);
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-
-
-
-
-

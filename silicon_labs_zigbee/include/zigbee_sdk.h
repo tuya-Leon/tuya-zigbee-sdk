@@ -781,6 +781,7 @@ typedef enum {
     ZG_CLEAR_ALL_DATA = 0,
     ZG_CLEAR_LATEST_DATA,
     ZG_CLEAR_ALL_SAME_DATA,
+    ZG_CLEAR_ALL_ZCL_ID,
 }ZG_CLEAR_TYPE_T;
 
 typedef void (*send_result_func_t)(SEND_ST_T, dev_send_data_t *);
@@ -814,6 +815,22 @@ typedef enum {
     V_TIMER1,
     V_TIMER2,
     V_TIMER3,
+    V_TIMER4,
+    V_TIMER5,
+    V_TIMER6,
+    V_TIMER7,
+    V_TIMER8,
+    V_TIMER9,
+    V_TIMER10,
+    V_TIMER11,
+    V_TIMER12,
+    V_TIMER13,
+    V_TIMER14,
+    V_TIMER15,
+    V_TIMER16,
+    V_TIMER17,
+    V_TIMER18,
+    V_TIMER19,
     V_TIMER_ERR = 0xFF
 }TIMER_ID_T;
 
@@ -825,6 +842,7 @@ typedef struct {
     hardware_timer_func_t func;
     TIMER_RELOAD_FLAG_T auto_reload_flag;
     uint8_t valid_flag;
+    uint8_t exe_flag;
 }hardware_timer_t;
 
 
@@ -1361,6 +1379,37 @@ extern uint16_t hal_adc_to_voltage(uint16_t adv_value);
 * @return: none
 */
 extern void hal_battery_config(battery_cfg_t *cfg, battery_table_t *table, uint8_t table_sums);
+
+/**
+* @description: delay battery capture and report battery info to gateway.
+* @param {delay_time} delay time. bet:ms
+* @return: none
+*/
+extern void hal_battery_capture_manual(uint32_t delay_time);
+
+typedef enum {
+    BATTERY_TYPE_DRY_BATTERY = 0,
+    BATTERY_TYPE_CHARGE_BATTERY,
+}BATTERY_TYPE_T;
+
+typedef enum {
+    DEV_BUSY_LEVEL_IDLE = 0, //always sleep
+    DEV_BUSY_LEVEL_ALWAYS,   //always wakeup
+}DEV_BUSY_LEVEL_T;
+
+/**
+* @description: Set battery type
+* BATTERY_TYPE_DRY_BATTERY:    Battery percentage always decrease.
+* BATTERY_TYPE_CHARGE_BATTERY: Permissible battery percentage increase.
+* DEV_BUSY_LEVEL_IDLE:   Battery capture in idle time.
+* DEV_BUSY_LEVEL_ALWAYS: battery capture when time out.
+* @param {type} battery type
+* @param {level} battery type
+* @return: none
+*/
+extern void hal_battery_set_battery_type(BATTERY_TYPE_T type, DEV_BUSY_LEVEL_T level);
+
+
 
 //******************************************************************************
 //                                                                              
@@ -2047,6 +2096,17 @@ typedef struct {
 typedef void (*sdk_evt_callback_fun_t)(cb_args_t *args);
 
 extern void sdk_cb_register(CALLBACK_TYPE_T type, sdk_evt_callback_fun_t func);
+
+
+typedef void (*soft_sv_callback_t)(void);
+
+/**
+ * @description: start a PendSV interrupt. PendSV_Handler will call this funciton(soft_sv_callback_t).
+ * @param {func} user function
+ * @return: none 
+ */
+extern void start_soft_int(soft_sv_callback_t func);
+
 #ifdef __cplusplus
 }
 #endif

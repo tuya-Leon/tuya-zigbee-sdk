@@ -13,26 +13,23 @@
 #ifndef ZIGBEE_MODULES_H
 #define ZIGBEE_MODULES_H
 
-typedef enum
-{
-    TYZS1 = 0,
-    TYZS1L,
-    TYZS2,
-    TYZS2R,
-    TYZS3,
-    TYZS4,
-    TYZS5,
-    TYZS5L,
-    TYZS6,
-    TYZS7,
-    TYZS8,
-    TYZS9V,
-    TYZS10,
-    TYZS11,
-    TYZS12,
-    TYZS13,
-    TYZS15
-}zigbee_modules_e;
+#define TYZS1  0
+#define TYZS1L 1
+#define TYZS2  2
+#define TYZS2R 3
+#define TYZS3  4
+#define TYZS4  5
+#define TYZS5  6
+#define TYZS5L 7
+#define TYZS6  8
+#define TYZS7  9
+#define TYZS8  10
+#define TYZS9V 11
+#define TYZS10 12
+#define TYZS11 13
+#define TYZS12 14
+#define TYZS13 15
+#define TYZS15 16
 
 #define TYZS3_USART_CONFIG_DEFAULT {\
     UART_ID_UART0,\

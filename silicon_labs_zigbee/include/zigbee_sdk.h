@@ -53,7 +53,7 @@ typedef struct {
     uint16_t poll_interval;     //poll period (bet: ms)
     uint16_t wait_app_ack_time; //tiemout waitting app ack (bet: ms)
     bool_t   poll_forever_flag; //TRUE: forever poll 
-    uint8_t  poll_failed_times; //enter parent-lost status when poll failed x times.
+    uint16_t  poll_failed_times; //enter parent-lost status when poll failed x times.
 }zg_poll_config_t;
 
 typedef struct {
@@ -417,7 +417,8 @@ typedef enum {
     MSG_SRC_GW_UNICAST,
     MSG_SRC_GW_BROADCAST,
     MSG_SRC_DEV_UNICAST,
-    MSG_SRC_DEV_BROADCAST
+    MSG_SRC_DEV_BROADCAST,
+    MSG_SRC_MULTICAST
 }MSG_SRC_T;
 
 typedef struct {
@@ -443,6 +444,7 @@ typedef struct {
     CLUSTER_ID_T cluster;
     uint8_t zcl_id;
     uint8_t endpoint;
+    uint16_t src_addr;
     union {
         attr_data_t attr_data;
         bare_data_t bare_data;
@@ -916,6 +918,11 @@ typedef enum
     ERROR_CODE_IO_ERROR  = 20,  // GPIO input or output error
     ERROR_CODE_MEM_ASSERT  = 21,  // memory assert error
 }DEV_ERROR_CODE_E;
+
+typedef enum {
+    DEV_RESET_TYPE_TO_FACTORY_ONLY = 0,
+    DEV_RESET_TYPE_TO_FACTORY_AND_LEAVE
+}DEV_RESET_TYPE_T;
 
 #ifdef APP_DEBUG
 #define app_print(...) uart_printf(UART_ID_UART0, __VA_ARGS__)
@@ -2106,6 +2113,13 @@ typedef void (*soft_sv_callback_t)(void);
  * @return: none 
  */
 extern void start_soft_int(soft_sv_callback_t func);
+
+/**
+ * @description: device recovery to factury command handler
+ * @param {type} just reset to fdactury or reset to factury and leave
+ * @return: none
+ */
+extern void dev_recovery_factory(DEV_RESET_TYPE_T type);
 
 #ifdef __cplusplus
 }

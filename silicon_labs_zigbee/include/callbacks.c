@@ -147,10 +147,10 @@ void dev_power_on_report_info(void)
 
 /**
  * @description: device recovery to factury command handler
- * @param {type} none
+ * @param {type} just reset to fdactury or reset to factury and leave
  * @return: none
  */
-void dev_recovery_factory(void)
+void dev_recovery_factory(DEV_RESET_TYPE_T type)
 {
     //TODO
 

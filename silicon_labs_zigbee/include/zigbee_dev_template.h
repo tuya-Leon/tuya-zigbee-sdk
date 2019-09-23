@@ -31,6 +31,7 @@ extern const uint8_t basic_default_value[];
     { 0x0005, ATTR_CHAR_STRING_ATTRIBUTE_TYPE, 33, (ATTR_MASK_SINGLETON),  NULL  }, /* 5 / Basic / model identifier*/\
     { 0x0006, ATTR_CHAR_STRING_ATTRIBUTE_TYPE, 17, (ATTR_MASK_SINGLETON),  NULL  }, /* 6 / Basic / date code*/\
     { 0x0007, ATTR_ENUM8_ATTRIBUTE_TYPE, 1, (ATTR_MASK_SINGLETON),  (uint8_t*)0x01  }, /* 7 / Basic / power source*/\
+    { 0xFFDE, ATTR_INT8U_ATTRIBUTE_TYPE, 1, (ATTR_MASK_SINGLETON | ATTR_MASK_WRITABLE),  (uint8_t*)13  }, /* 8 / basic / tx power cfg*/\
     { 0xFFFD, ATTR_INT16U_ATTRIBUTE_TYPE, 2, (ATTR_MASK_SINGLETON),  (uint8_t*)0x0001  }, /* 8 / Basic / cluster revision*/\
     { 0xFFFE, ATTR_ENUM8_ATTRIBUTE_TYPE, 1, (ATTR_MASK_SINGLETON),  (uint8_t*)0x00  },/*9*/\
 

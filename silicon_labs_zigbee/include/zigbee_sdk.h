@@ -19,9 +19,9 @@ extern "C" {
 #include "hal_battery.h"
 
 
-#if defined (__IAR_SYSTEMS_ICC__)
-    #define  VIRTUAL_FUNC __weak
-#else
+#if defined (__IAR_SYSTEMS_ICC__) //for IAR
+    #define VIRTUAL_FUNC __weak
+#else //for gcc
     #define VIRTUAL_FUNC __attribute__((weak))
 #endif
 
@@ -361,6 +361,7 @@ typedef enum {
 #define ATTR_MASK_TOKEN_FAST (0x80)
 
 typedef enum {
+    NET_IDLE,
     NET_POWER_ON_LEAVE,     //power on and device is not joined network
     NET_POWER_ON_ONLINE,    //power on and device is already joined network
     NET_JOIN_START,         //start joining network
@@ -480,7 +481,7 @@ typedef enum {
 }MF_TEST_CMD_T;
 
 typedef enum {
-    DEV_EVT_1  = 25,
+    DEV_EVT_1  = 35,
     DEV_EVT_2,
     DEV_EVT_3,
     DEV_EVT_4,
@@ -1163,11 +1164,30 @@ extern void hardware_timer_disable(void);
 extern TIMER_ID_T timer_hardware_start_100us(uint32_t t, TIMER_RELOAD_FLAG_T flag, hardware_timer_func_t func);
 
 /**
+ * @description: hardware timer start with a us timedelay
+ * @param {i} user define TIMER_ID_T, the used method is same with dev_timer_start_with_callback();
+ * @param {t} times with us
+ * @param {flag} reload timer or not
+ * @param {func} callback function
+ * @return: none
+ */
+extern void timer_hardware_start_with_id(TIMER_ID_T i, uint32_t t, TIMER_RELOAD_FLAG_T flag, hardware_timer_func_t func);
+
+/**
  * @description: hardware timer stop
  * @param {id} time id
  * @return: none
  */
 extern void timer_hardware_stop_100us(TIMER_ID_T id);
+
+
+/**
+ * @description: get timer active flag
+ * @param {id} time id
+ * @return: TRUE:active, FALSE:inactive 
+ */
+extern bool_t timer_hardware_is_active(TIMER_ID_T id);
+
 
 /**
  * @description: get the current systerm millisecond ticks
@@ -1395,14 +1415,36 @@ extern void hal_battery_config(battery_cfg_t *cfg, battery_table_t *table, uint8
 extern void hal_battery_capture_manual(uint32_t delay_time);
 
 typedef enum {
-    BATTERY_TYPE_DRY_BATTERY = 0,
-    BATTERY_TYPE_CHARGE_BATTERY,
+    BATTERY_TYPE_DRY_BATTERY = 0,  //Battery percentage always decrease.
+    BATTERY_TYPE_CHARGE_BATTERY,   //Permissible battery percentage increase.
 }BATTERY_TYPE_T;
 
 typedef enum {
     DEV_BUSY_LEVEL_IDLE = 0, //always sleep
-    DEV_BUSY_LEVEL_ALWAYS,   //always wakeup
+    DEV_BUSY_LEVEL_ALWAYS,   //always wakeup, example: poll forever.
 }DEV_BUSY_LEVEL_T;
+
+typedef enum {
+    BATTERY_REPORT_DECREASE_LIMITS_10 = 1,
+    BATTERY_REPORT_DECREASE_LIMITS_20,
+    BATTERY_REPORT_DECREASE_LIMITS_30,
+    BATTERY_REPORT_DECREASE_LIMITS_40,
+    BATTERY_REPORT_DECREASE_LIMITS_50,
+    BATTERY_REPORT_DECREASE_LIMITS_60,
+    BATTERY_REPORT_DECREASE_LIMITS_70,
+    BATTERY_REPORT_DECREASE_LIMITS_80,
+    BATTERY_REPORT_DECREASE_LIMITS_90,
+    BATTERY_REPORT_NO_LIMITS,
+    BATTERY_REPORT_EXT_LIMITS,
+}BATTERY_REPORT_DECREASE_LIMITS_T;
+
+typedef struct {
+    BATTERY_TYPE_T   type;
+    DEV_BUSY_LEVEL_T level;
+    bool_t report_no_limits_first;
+    BATTERY_REPORT_DECREASE_LIMITS_T limits;
+    uint8_t ext_limits;
+}battery_report_policy_t;
 
 /**
 * @description: Set battery type
@@ -1416,7 +1458,26 @@ typedef enum {
 */
 extern void hal_battery_set_battery_type(BATTERY_TYPE_T type, DEV_BUSY_LEVEL_T level);
 
-
+/**
+* @description: config report policy.
+* type:
+*   BATTERY_TYPE_DRY_BATTERY:    Battery percentage always decrease.
+*   BATTERY_TYPE_CHARGE_BATTERY: Permissible battery percentage increase.
+* level:
+*   DEV_BUSY_LEVEL_IDLE:   Battery capture in idle time.
+*   DEV_BUSY_LEVEL_ALWAYS: battery capture when time out.
+* report_no_limits_first:
+*   TRUE: report the actual battery percentage value first.
+*   FALSE: report the handled battery percentage value first. 
+* limits:
+*   the limit level of report power percentage.
+* ext_limits:
+*   use othes value if limits = BATTERY_REPORT_EXT_LIMITS.  limits[2, 100]
+* @param {type} battery type
+* @param {level} battery type
+* @return: none
+*/
+extern void hal_battery_report_policy_config(battery_report_policy_t *policy);
 
 //******************************************************************************
 //                                                                              
@@ -1574,18 +1635,25 @@ extern void zg_rejoin_scan_policy(ZG_SCAN_POLICY_T type);
 extern void zg_poll_interval_change(uint16_t poll_interval);
 
 /**
- * @description: start poll manual
+ * @description: start poll manual. POLL will be send forever.
  * @param {type} none
  * @return: none
  */
 extern void zg_poll_start(void);
 
 /**
- * @description: stop poll manual
+ * @description: stop poll manual. the rest of POLL will be send.
  * @param {t} none
  * @return: none
  */
- extern void zg_poll_end(void);
+extern void zg_poll_end(void);
+
+/**
+ * @description: stop poll manual. the rest of POLL will be clean.
+ * @param {t} none
+ * @return: none
+ */
+extern void zg_poll_clear(void);
 
 /**
  * @description: device wakeup with a time; when timeout, it will be sleep
@@ -1675,15 +1743,12 @@ extern uint32_t random_ms(uint32_t t);
  */
 extern uint16_t make_crc16(uint8_t *msg, uint16_t len);
 
-
-//firmware security config
 /**
- * @description: device firmware security mode enable
- * @param {data} data
- * @param {data_len} data length
- * @return: crc result
+ * @description: firmware security config
+ * @param {flag} TRUE: switch on verify,  FALSE: swicth off verify.
+ * @return: none
  */
-extern void dev_security_mode_enable(void);
+extern void dev_security_mode_set(bool_t flag);
 
 /**
  * @description:  scene cluster view valid callback, this function is used to check if the secne and group of the endpoint is exist 
@@ -2030,6 +2095,58 @@ void zll_Server_touchlink_joined(uint16_t panId );
  * @return: none
  */
 void zll_Server_touchlink_leave(void);
+
+// zll client api
+
+typedef struct{
+    uint8_t long_addr[8];
+    uint16_t short_addr;
+    uint8_t ep_num;
+    uint8_t ep_val[16];
+}zll_device_info_t;
+
+
+/**
+ * @description: zll  joined device callback 
+ * @param {zll  target device information} 
+ * @return: none
+ */
+void zll_joined_device_info(zll_device_info_t zll_dev_info);
+
+/**
+ * @description: zll  touch link scan failed callback
+ * @param {none} 
+ * @return: none
+ */
+void zll_touch_link_failed(void);
+
+/**
+ * @description: zll  touch link scan 
+ * @param {none} 
+ * @return: none
+ */
+void zll_touch_link_scan(void);
+
+/**
+ * @description: zll  device information request
+ * @param {none} 
+ * @return: none
+ */
+void zll_device_information_request(void);
+
+/**
+ * @description: zll  identify request
+ * @param {none} 
+ * @return: none
+ */
+void zll_identify_request(void);
+
+/**
+ * @description: zll reset to factory new request
+ * @param {none} 
+ * @return: none
+ */
+void zll_reset_to_factory_new_request(void);
 // APIs for ZLL end
 /*********************************************/
 
@@ -2084,6 +2201,8 @@ bool_t dev_error_code_set(DEV_ERROR_CODE_E err_code);
 
 typedef enum {
     CALLBACK_TYPE_REPORT_BATTERY = 0,
+    CALLBACK_TYPE_CAPTURE_BATTERY,
+    CALLBACK_TYPE_POLL,
 }CALLBACK_TYPE_T;
 
 typedef struct {
@@ -2093,10 +2212,22 @@ typedef struct {
     uint8_t  real_percent;
 }cb_battery_args_t;
 
+typedef enum {
+    POLL_OK = 0,
+    POLL_NO_ACK,
+    POLL_BUSY,
+}POLL_RESULT_T;
+
+typedef struct {
+    POLL_RESULT_T result;
+}cb_poll_args_t;
+
+
 typedef struct {
     CALLBACK_TYPE_T type;
     union {
         cb_battery_args_t battery;
+        cb_poll_args_t poll;
     }args;
 }cb_args_t;
 
@@ -2120,6 +2251,57 @@ extern void start_soft_int(soft_sv_callback_t func);
  * @return: none
  */
 extern void dev_recovery_factory(DEV_RESET_TYPE_T type);
+
+
+typedef enum {
+    VALUE_TYPE_STRING,         //ex:char a[3] = {'n','b','\0'};
+    VALUE_TYPE_CHAR,           //ex:char a = 'b';
+    VALUE_TYPE_NUMBER_DECIMAL, //ex:u32 a = 100000;
+    VALUE_TYPE_NUMBER_HEX,     //ex:u8 a[3] = {2,0xDE,0xED}; 2=>hex sums
+}VALUE_TYPE;
+
+typedef struct {
+    char* key;          //user "json" key
+    void* value;        //user value buffer
+    uint8_t value_size; //user value buffer length
+    VALUE_TYPE type;    //user value type
+    bool_t handle_flag; //TRUE: got a valid value.
+}key_value_t;
+
+
+/**@brief Load device information
+ *
+ * @param[len] OUT len Data length
+ * @param[data] OUT data Data to be retrieved.
+ *
+ * @return Return success or
+ */
+extern bool_t oem_config_load(uint16_t *len, uint8_t **data);
+
+/**
+ * @description: setting oem-config-data, 
+ * @param {data} IN oem config data
+ * @param {data_len} IN oem config data length
+ * @return: TRUE or FALSE
+ */
+extern bool_t oem_config_set(uint8_t *data, uint16_t data_len);
+
+/**
+ * @description: Parse key-value data, ex: {key1:value1,key2:value2,} 
+ * @param {kv_str} IN key-value strings.
+ * @param {int_out_table} IN OUT user table
+ * @param {table_sums} IN OUT user table sums
+ * @return: TRUE or FALSE
+ */
+extern bool_t get_key_values(char *kv_str, key_value_t *int_out_table, uint16_t table_sums);
+
+/**
+ * @description: load oem config and parse key-value data, ex: {key1:value1,key2:value2,} 
+ * @param {int_out_table} IN OUT user table
+ * @param {table_sums} IN OUT user table sums
+ * @return: TRUE or FALSE
+ */
+extern bool_t get_oem_key_values(key_value_t *int_out_table, uint16_t table_sums);
 
 #ifdef __cplusplus
 }

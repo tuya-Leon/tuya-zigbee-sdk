@@ -211,6 +211,34 @@ void dev_msg_write_attr_callback(uint8_t endpoint, CLUSTER_ID_T cluster, uint16_
 }
 
 /**
+ * @description: write sttribute callback function
+ * @param {endpoint} the endpoint of the write attribute
+ * @param {cluster} the cluster id of the write attribute
+ * @param {attr_id} the attribute id  of the write attribute
+ * @param {mask} the attribute id mask
+ * @param {manufacturerCode} manufacturerCode
+ * @param {type} attribute data type
+ * @param {size} data length
+ * @param {value} attribute value
+ * @return: none
+ */
+void dev_msg_write_attr_callback_ext(
+    uint8_t endpoint, 
+    CLUSTER_ID_T cluster, 
+    uint16_t attr_id,
+    uint8_t mask,
+    uint16_t manufacturerCode,
+    uint8_t type,
+    uint8_t size,
+    uint8_t* value))
+{
+    //TODO
+
+    return;
+}
+
+
+/**
  * @description: key event handler 
  * @param {key_id} key  id
  * @param {key_st} key status

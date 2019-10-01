@@ -40,6 +40,7 @@
 #define ATTR_DISABLE_LOCAL_CONFIG_ATTRIBUTE_ID                  0x0014 // Ver.: always
 #define ATTR_CURRENT_LOCALE_ATTRIBUTE_ID                        0x0015 // Ver.: always
 #define ATTR_SW_BUILD_ID_ATTRIBUTE_ID                           0x4000 // Ver.: since zll-1.0-11-0037-10
+#define ATTR_BASIC_CLUSTER_TX_POWER_CFG_ATTRIBUTE_ID            0xFFDE // tx power config
 #define ATTR_BASIC_CLUSTER_CLUSTER_REVISION_SERVER_ATTRIBUTE_ID 0xFFFD // Ver.: since zcl-6.0-15-02017-001
 #define ATTR_BASIC_CLUSTER_REPORTING_STATUS_SERVER_ATTRIBUTE_ID 0xFFFE // Ver.: since zcl-6.0-15-02017-001
 

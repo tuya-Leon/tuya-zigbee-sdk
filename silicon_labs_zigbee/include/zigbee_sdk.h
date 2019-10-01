@@ -910,14 +910,15 @@ typedef enum{
 
 typedef enum
 {
-    ERROR_CODE_IDLE = 0, // idle state
+    ERROR_CODE_IDLE             = 0, // idle state
     /*1-15 is used by sdk*/
-    ERROR_CODE_ABNORMAL_RESET = 16, // device reset
-    ERROR_CODE_PARENT_LOST = 17, // device parent lost
-    ERROR_CODE_NWK_LEAVE_SELF  = 18, // device leave network by itself
-    ERROR_CODE_NWK_LEAVE_GW  = 19, // device leave network by remote command, such as gateway or it's parent
-    ERROR_CODE_IO_ERROR  = 20,  // GPIO input or output error
-    ERROR_CODE_MEM_ASSERT  = 21,  // memory assert error
+    ERROR_CODE_ABNORMAL_RESET   = 16, // device reset
+    ERROR_CODE_PARENT_LOST      = 17, // device parent lost
+    ERROR_CODE_NWK_LEAVE_SELF   = 18, // device leave network by itself
+    ERROR_CODE_NWK_LEAVE_GW     = 19, // device leave network by remote command, such as gateway or it's parent
+    ERROR_CODE_IO_ERROR         = 20,  // GPIO input or output error
+    ERROR_CODE_MEM_ASSERT       = 21,  // memory assert error
+    ERROR_CODE_ADDR_CHANGE      = 22,  // memory assert error
 }DEV_ERROR_CODE_E;
 
 typedef enum {
@@ -1414,6 +1415,13 @@ extern void hal_battery_config(battery_cfg_t *cfg, battery_table_t *table, uint8
 */
 extern void hal_battery_capture_manual(uint32_t delay_time);
 
+/**
+* @description: change battery capture period.
+* @param {cap_period_time} battery capture period
+* @return: none
+*/
+extern void hal_battery_capture_period_change(uint32_t cap_period_time);
+
 typedef enum {
     BATTERY_TYPE_DRY_BATTERY = 0,  //Battery percentage always decrease.
     BATTERY_TYPE_CHARGE_BATTERY,   //Permissible battery percentage increase.
@@ -1720,14 +1728,6 @@ extern ATTR_CMD_RET_T dev_zigbee_read_attribute(
 );
 
 //base tools
-/**
- * @description: battery information get funtion
- * @param {percent} percentage attribute of power configure cluster
- * @param {voltage} voltage attribute of power configure cluster
- * @return: none
- */
-extern void get_battery_info(uint8_t *percent, float *voltage);
-
 /**
  * @description: random a time with 0-t ms
  * @param {t} random maxinum ms
@@ -2055,6 +2055,20 @@ void set_read_time_period(uint32_t time_period);
  */
 uint32_t  get_current_time(void);
 
+/**
+ * @description: set time update interval. default value: 1 (unit: second)
+ * @param {interval_sec} update ervery interval_sec.
+ * @return: none
+ */
+void dev_time_tick_update_interval_set(uint16_t interval_sec);
+
+/**
+ * @description: get the parameter of update time (unit:second)
+ * @param none
+ * @return: interval of update time (unit:S)
+ */
+uint16_t dev_time_tick_update_interval_get(void);
+
 
 /**
  * @description: get device current time with convert time struct
@@ -2302,6 +2316,156 @@ extern bool_t get_key_values(char *kv_str, key_value_t *int_out_table, uint16_t 
  * @return: TRUE or FALSE
  */
 extern bool_t get_oem_key_values(key_value_t *int_out_table, uint16_t table_sums);
+         
+///////////////////////////////////////////////////////////////
+//timer1 hardware tools.
+//int flag
+#define INT_FLAG_ICBOF3  (0x80UL)
+#define INT_FLAG_ICBOF2  (0x400UL)
+#define INT_FLAG_ICBOF1  (0x200UL)
+#define INT_FLAG_ICBOF0  (0x100UL)
+#define INT_FLAG_CC3     (0x80UL)
+#define INT_FLAG_CC2     (0x40UL)
+#define INT_FLAG_CC1     (0x20UL)
+#define INT_FLAG_CC0     (0x10UL)
+#define INT_FLAG_UF      (0x02UL)
+#define INT_FLAG_OF      (0x01UL)
+
+typedef void (*timer1_int_callback_t)(uint32_t int_flag);
+
+typedef enum {
+    TIMER1_CC0 = 0,
+    TIMER1_CC1 = 1,
+    TIMER1_CC2 = 2,
+    TIMER1_CC3 = 3,
+}TIMER1_CC_T;
+
+typedef enum {
+    TIMER_DIV1 = 0,     /**< Divide by 1. */
+    TIMER_DIV2,         /**< Divide by 2. */
+    TIMER_DIV4,         /**< Divide by 4. */
+    TIMER_DIV8,         /**< Divide by 8. */
+    TIMER_DIV16,        /**< Divide by 16. */
+    TIMER_DIV32,        /**< Divide by 32. */
+    TIMER_DIV64,        /**< Divide by 64. */
+    TIMER_DIV128,       /**< Divide by 128. */
+    TIMER_DIV256,       /**< Divide by 256. */
+    TIMER_DIV512,       /**< Divide by 512. */
+    TIMER_DIV1024,      /**< Divide by 1024. */
+}TIMER_DIV_T;
+
+/**
+ * @description: timer1 init
+ * @param {enable} init completed enable
+ * @param {prescale} timer prescale
+ * @param {func} timer callback
+ * @return: none
+ */
+extern void dev_timer1_init(bool_t enable, TIMER_DIV_T prescale, timer1_int_callback_t func);
+
+/**
+ * @description: get timer1 count value
+ * @param {type} none
+ * @return: none
+ */
+extern uint32_t dev_timer1_counter_get(void);
+
+
+/**
+ * @description: clear timer1 count value
+ * @param {type} none
+ * @return: none
+ */
+extern void dev_timer1_counter_reset(void);
+
+/**
+ * @description: timer1 overflow interrupt enable/disable
+ * @param {type} none
+ * @return: none
+ */
+extern void dev_timer1_overflow_int_set(bool_t int_enable);
+
+
+/**
+ * @description: set timer top value
+ * @param {us} us
+ * @return: none
+ */
+extern void dev_timer1_top_set(uint32_t us);
+
+/**
+ * @description: set timer top buff value,will ato updated in next wrap around
+ * @param {us} us
+ * @return: none
+ */
+extern void dev_timer1_top_next_set(uint32_t us);
+
+/**
+ * @description: init timer1 compare mode and enable compare interrupt
+ * @param {ch} compare channel
+ * @return: none
+ */
+extern void dev_timer1_cc_init(TIMER1_CC_T ch);
+
+
+/**
+ * @description: default init timer capture/compare and disable interrupt
+ * @param {type} none
+ * @return: none
+ */
+extern void dev_timer1_cc_deinit(TIMER1_CC_T ch);
+
+/**
+ * @description: compare interrupt enable/disable
+ * @param {type} none
+ * @return: none
+ */
+extern void dev_timer1_cc_int_set(TIMER1_CC_T ch, bool_t int_enable);
+
+/**
+ * @description: set compare value
+ * @param {ch} channel
+ * @param {us} us
+ * @return: none
+ */
+extern void dev_timer1_compare_counter_set(TIMER1_CC_T ch, uint32_t us);
+
+/**
+ * @description: set timer compare buff value,will ato updated in next wrap around
+ * @param {ch} channel
+ * @param {us} us
+ * @return: none
+ */
+extern void dev_timer1_compare_counter_buf_set(TIMER1_CC_T ch, uint32_t us);
+
+/**
+ * @description: start timer1
+ * @param {type} none
+ * @return: none
+ */
+extern void dev_timer1_start(void);
+
+/**
+ * @description: stop timer1
+ * @param {type} none
+ * @return: none
+ */
+extern void dev_timer1_stop(void);
+
+/**
+ * @description: reset timer1
+ * @param {type} none
+ * @return: none
+ */
+extern void dev_timer1_reset(void);
+
+/**
+ * @description: get timer1 start flag
+ * @param {type} none
+ * @return: none
+ */
+extern bool_t dev_timer1_started(void);
+
 
 #ifdef __cplusplus
 }

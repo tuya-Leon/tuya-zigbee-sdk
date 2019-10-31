@@ -62,6 +62,7 @@ typedef struct {
 }zg_sleep_end_device_config;
 
 typedef struct {
+    zg_poll_config_t    poll_conifg;
     zg_rejoin_config_t  rejoin_config;
 }zg_end_device_config;
 
@@ -698,6 +699,7 @@ typedef enum {
     SEND_MODE_GW,
     SEND_MODE_GROUP,
     SEND_MODE_BINDING,
+    SEND_MODE_DEV,
 }SEND_MODE_T;
 
 typedef struct {
@@ -718,11 +720,20 @@ typedef struct {
 }gw_addr_t;
 
 typedef struct {
+    uint8_t dest_addr;
+    uint8_t src_ep;
+    uint8_t dest_ep;
+    CLUSTER_ID_T cluster_id;
+}dev_addr_t;
+
+
+typedef struct {
     SEND_MODE_T mode;
     union {
         group_addr_t group;
         bind_addr_t  bind;
         gw_addr_t    gw;
+        dev_addr_t   dev;
     }type;
 } af_addr_t;
 
@@ -918,7 +929,9 @@ typedef enum
     ERROR_CODE_NWK_LEAVE_GW     = 19, // device leave network by remote command, such as gateway or it's parent
     ERROR_CODE_IO_ERROR         = 20,  // GPIO input or output error
     ERROR_CODE_MEM_ASSERT       = 21,  // memory assert error
-    ERROR_CODE_ADDR_CHANGE      = 22,  // memory assert error
+    ERROR_CODE_ADDR_CHANGE      = 22,  // add change
+    ERROR_CODE_RESET_LEAVE      = 23,  // recv ZCL_RESET_TO_FACTORY_DEFAULTS_COMMAND_ID
+    ERROR_CODE_RESET_NO_LEAVE   = 24,  // recv basic cluster cmd 0xF0(private cmd)
 }DEV_ERROR_CODE_E;
 
 typedef enum {
@@ -1571,6 +1584,22 @@ extern uint8_t user_flash_data_read(uint8_t *data, uint8_t len);
 //                              zigbee api                              
 //                                                                              
 //******************************************************************************
+
+typedef struct {
+    uint16_t pan_id;
+    uint16_t short_addr;
+    uint8_t  channel;
+    int8_t   tx_power_db;
+    uint8_t  ext_pan_id[8];
+}zg_info_t;
+
+
+/**
+ * @description: get zigbee dev network status information
+ * @param {out_zg_info} output information
+ * @return: bool_t: return TRUE if ok. return FLASE else.
+ */
+extern bool_t zigbee_get_net_info(zg_info_t *out_zg_info);
 extern NET_EVT_T nwk_state_get(void);
 
 /**
@@ -2272,15 +2301,15 @@ typedef enum {
     VALUE_TYPE_CHAR,           //ex:char a = 'b';
     VALUE_TYPE_NUMBER_DECIMAL, //ex:u32 a = 100000;
     VALUE_TYPE_NUMBER_HEX,     //ex:u8 a[3] = {2,0xDE,0xED}; 2=>hex sums
-}VALUE_TYPE;
+}OEM_VALUE_TYPE;
 
 typedef struct {
     char* key;          //user "json" key
     void* value;        //user value buffer
     uint8_t value_size; //user value buffer length
-    VALUE_TYPE type;    //user value type
+    OEM_VALUE_TYPE type;    //user value type
     bool_t handle_flag; //TRUE: got a valid value.
-}key_value_t;
+}oem_key_value_t;
 
 
 /**@brief Load device information
@@ -2307,7 +2336,7 @@ extern bool_t oem_config_set(uint8_t *data, uint16_t data_len);
  * @param {table_sums} IN OUT user table sums
  * @return: TRUE or FALSE
  */
-extern bool_t get_key_values(char *kv_str, key_value_t *int_out_table, uint16_t table_sums);
+extern bool_t get_key_values(char *kv_str, oem_key_value_t *int_out_table, uint16_t table_sums);
 
 /**
  * @description: load oem config and parse key-value data, ex: {key1:value1,key2:value2,} 
@@ -2315,7 +2344,7 @@ extern bool_t get_key_values(char *kv_str, key_value_t *int_out_table, uint16_t 
  * @param {table_sums} IN OUT user table sums
  * @return: TRUE or FALSE
  */
-extern bool_t get_oem_key_values(key_value_t *int_out_table, uint16_t table_sums);
+extern bool_t get_oem_key_values(oem_key_value_t *int_out_table, uint16_t table_sums);
          
 ///////////////////////////////////////////////////////////////
 //timer1 hardware tools.
@@ -2466,6 +2495,49 @@ extern void dev_timer1_reset(void);
  */
 extern bool_t dev_timer1_started(void);
 
+/**
+ * @description: get the gpio port and pin according the index
+ * @param {index} gpio index
+ * @return: gpio port and pin 
+ */
+GPIO_PORT_PIN_T* oem_gpio_get(uint8_t index);
+
+
+typedef enum {
+    ZG_JOIN_TYPE_CENTRALIZED = 0, //centralized join to gateway
+    ZG_JOIN_TYPE_DISTRIBUTE,      //distribute join to router
+    ZG_JOIN_TYPE_UNKNOWN          //no network
+}ZG_JOIN_TYPE_T;
+
+extern ZG_JOIN_TYPE_T zg_get_join_type(void);
+extern bool_t zg_is_zll_net(void); //for zll lib
+
+
+
+//simple json parse function
+typedef enum {
+    JSON_RET_PARSE_OK = 0,
+    JSON_RET_ERR
+}JSON_RET_T;
+
+/*usage:
+    char *json_str  = "{\"key1\":\"hello\", \"key2\":1000}";
+    char value_str[128] = {0};
+    int value_int;
+    JSON_RET_T ret;
+
+    ret = json_get_str_value(json_str, "key1", value_str, sizeof(value_str));
+    if(ret == JSON_RET_PARSE_OK) {
+        app_print("key1's value: %s\n", value_str); // value_str equ hello
+    }
+
+    ret = json_get_int_value(json_str, "key2", &value_int); //value_int equ 1000
+    if(ret == JSON_RET_PARSE_OK) {
+        app_print("key2's value: %d\n", value_int);
+    }
+*/
+extern JSON_RET_T json_get_str_value(const char *json_str, char *key, char *out_buffer, uint16_t out_buffer_len);
+extern JSON_RET_T json_get_int_value(const char *in_json_str, char *key, int *out_int_value);
 
 #ifdef __cplusplus
 }

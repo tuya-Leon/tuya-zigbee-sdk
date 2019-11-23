@@ -413,6 +413,8 @@ typedef enum {
     SEND_ST_ERR,
     SEND_ST_MEMORY_ERR,
     SEND_ST_QUEUE_FULL_ERR,
+    SEND_ST_NO_NETWORK,
+    SEND_ST_ADDR_MODE_ERR,
 }SEND_ST_T;
 
 typedef enum {
@@ -932,6 +934,7 @@ typedef enum
     ERROR_CODE_ADDR_CHANGE      = 22,  // add change
     ERROR_CODE_RESET_LEAVE      = 23,  // recv ZCL_RESET_TO_FACTORY_DEFAULTS_COMMAND_ID
     ERROR_CODE_RESET_NO_LEAVE   = 24,  // recv basic cluster cmd 0xF0(private cmd)
+    ERROR_CODE_WAKUP_TIMEOUT    = 25,  // a sleep device is always wakeup.
 }DEV_ERROR_CODE_E;
 
 typedef enum {
@@ -1595,6 +1598,28 @@ typedef struct {
 
 
 /**
+ * @description: disable self recovery. NOTE: call this function after dev_zigbee_join_start()
+ * @param {type} none
+ * @return: none
+ */
+extern void nwk_disable_self_recovery_once(void);
+
+
+/**
+ * @description: enable self recovery. NOTE: call this function after join timeout.
+ * @param {type} none
+ * @return: none
+ */
+extern void nwk_enable_self_recovery_once(void);
+
+/**
+ * @description: self recovery. NOTE: call this function after join timeout
+ * @param {type} none
+ * @return: none
+ */
+extern void nwk_self_recovery_manual(void);
+
+/**
  * @description: get zigbee dev network status information
  * @param {out_zg_info} output information
  * @return: bool_t: return TRUE if ok. return FLASE else.
@@ -1720,6 +1745,13 @@ extern void zg_rejoin_manual(void);
  * @return: none
  */
 extern bool_t zg_is_busy(void);
+
+/**
+ * @description: zigbee is joined or not?
+ * @param {type} none
+ * @return: boolt_t  TRUE: joined. FALSE no network.
+ */
+extern bool_t zg_is_join(void);
 
 
 /**
@@ -2345,6 +2377,15 @@ extern bool_t get_key_values(char *kv_str, oem_key_value_t *int_out_table, uint1
  * @return: TRUE or FALSE
  */
 extern bool_t get_oem_key_values(oem_key_value_t *int_out_table, uint16_t table_sums);
+
+
+/**
+ * @description: get system authkey for security.
+ * @param {buf} a buffer store authkey
+ * @param {buf_len} buffer length
+ * @return: authkey length. 0 means error.
+ */
+extern uint8_t dev_get_auth_key(uint8_t *buf, uint8_t buf_len);
          
 ///////////////////////////////////////////////////////////////
 //timer1 hardware tools.
@@ -2500,19 +2541,35 @@ extern bool_t dev_timer1_started(void);
  * @param {index} gpio index
  * @return: gpio port and pin 
  */
-GPIO_PORT_PIN_T* oem_gpio_get(uint8_t index);
+extern GPIO_PORT_PIN_T* oem_gpio_get(uint8_t index);
 
 
 typedef enum {
     ZG_JOIN_TYPE_CENTRALIZED = 0, //centralized join to gateway
     ZG_JOIN_TYPE_DISTRIBUTE,      //distribute join to router
-    ZG_JOIN_TYPE_UNKNOWN          //no network
+    ZG_JOIN_TYPE_NO_NETWORK       //no network
 }ZG_JOIN_TYPE_T;
 
 extern ZG_JOIN_TYPE_T zg_get_join_type(void);
 extern bool_t zg_is_zll_net(void); //for zll lib
 
 
+#define DEV_DEFAULT_WAKEUP_MAX_TIMEOUT   (1000*60*2)  //default max wakeup interval is 2 min
+/**
+ * @description: set the unusual wakeup timeout times for sleep end device. if the wakeup time is more than the wakeupTime,
+    then will call the dev_unusual_wakeup_timeout_callback function to app;
+ * @param {wakeupTime} wakeup time
+ * @return: none 
+ */
+extern void dev_unusual_wakeup_timeout_set(uint32_t wakeupTime);
+
+/**
+ * @description: a weak function. default return TRUE. user can  redefine this function.
+                 unusal wakeup timeout time callback function
+ * @param {} user function
+ * @return: bool_t TRUE: system will reboot, FLASE: system do nothing.
+ */
+VIRTUAL_FUNC bool_t dev_unusual_wakeup_timeout_callback(void);
 
 //simple json parse function
 typedef enum {

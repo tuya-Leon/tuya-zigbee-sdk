@@ -28,12 +28,18 @@ typedef enum
     MF_TEST_DOING
 } MF_TEST_RET_T;
 
+typedef enum {
+    MF_TEST_SRC_UART = 0,
+    MF_TEST_SRC_ZIGBEE,
+    MF_TEST_SRC_BEACON,
+}MF_TEST_SRC_T;
+
 /**
 * @description: device manufactury test result notify function
 * @param {result} none
 * @return: MF_TEST_RET_T manufactury test resut status
 */
-extern void dev_mf_noti_result(MF_TEST_RET_T result);
+extern void dev_mf_result_notify(MF_TEST_RET_T result);
 
 /**
 * @description: device manufactury test(button test) notify 
@@ -60,6 +66,9 @@ extern void dev_mf_bool_sensor_notify(uint8_t sensor_type, uint8_t index, bool_t
 * @return: none
 */
 extern void dev_mf_general_send(uint8_t cmd, uint8_t len, uint8_t *data);
+
+
+extern bool_t dev_mf_test_is_doing(MF_TEST_SRC_T *src);
 
 #ifdef __cplusplus
 }

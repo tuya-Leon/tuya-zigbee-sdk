@@ -230,7 +230,7 @@ void dev_msg_write_attr_callback_ext(
     uint16_t manufacturerCode,
     uint8_t type,
     uint8_t size,
-    uint8_t* value))
+    uint8_t* value)
 {
     //TODO
 

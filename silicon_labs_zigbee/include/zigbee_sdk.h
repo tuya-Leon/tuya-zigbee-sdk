@@ -935,6 +935,7 @@ typedef enum
     ERROR_CODE_RESET_LEAVE      = 23,  // recv ZCL_RESET_TO_FACTORY_DEFAULTS_COMMAND_ID
     ERROR_CODE_RESET_NO_LEAVE   = 24,  // recv basic cluster cmd 0xF0(private cmd)
     ERROR_CODE_WAKUP_TIMEOUT    = 25,  // a sleep device is always wakeup.
+    ERROR_CODE_RESET_LEAVE_INVALID = 26, //recv ZCL_RESET_TO_FACTORY_DEFAULTS_COMMAND_ID with invalid arguments.
 }DEV_ERROR_CODE_E;
 
 typedef enum {
@@ -1681,6 +1682,13 @@ extern void dev_zigbee_leave_for_user(void);
  * @return: none
  */
 extern void dev_change_power(int8_t normal_db, int8_t max_db);
+
+/**
+ * @description: disable gateway change tx power.
+ * @param {none} 
+ * @return: none
+ */
+extern void disable_gw_change_power(void);
 
 /**
  * @description: rejoin scan channel config
